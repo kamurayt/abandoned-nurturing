@@ -1,0 +1,381 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>放置インフレゲーム - プロトタイプ</title>
+    <style>
+        body { font-family: sans-serif; background-color: #f0f0f0; margin: 0; padding: 20px; display: flex; justify-content: center; }
+        #game-container { width: 400px; background-color: white; border: 2px solid #333; border-radius: 10px; padding: 10px; box-sizing: border-box; position: relative; }
+        
+        /* 上部UI */
+        .top-bar { display: flex; justify-content: space-between; margin-bottom: 10px; font-weight: bold; }
+        
+        /* 敵エリア */
+        #enemy-area { height: 140px; border: 3px solid #d32f2f; border-radius: 10px; display: flex; flex-direction: column; align-items: center; justify-content: center; margin-bottom: 5px; background-color: #ffebee; }
+        #enemy-hp-bar { width: 80%; height: 20px; background-color: #ddd; border-radius: 10px; overflow: hidden; margin-top: 10px; }
+        #enemy-hp-fill { width: 100%; height: 100%; background-color: #f44336; transition: width 0.1s; }
+        
+        /* 命中情報の表示 */
+        #hit-requirement-display { text-align: center; font-size: 11px; color: #d32f2f; font-weight: bold; margin-bottom: 10px; }
+        
+        /* 味方キャラエリア */
+        .char-area { display: flex; justify-content: space-around; border: 2px solid #333; padding: 10px; border-radius: 10px; margin-bottom: 15px; background-color: #f9f9f9; }
+        .char-slot { width: 90px; height: 75px; border: 2px dashed #999; border-radius: 10px; display: flex; flex-direction: column; align-items: center; justify-content: center; font-size: 11px; text-align: center; background-color: #fafafa; }
+        .active-char { border: 2px solid #2196f3; background-color: #e3f2fd; font-weight: bold; }
+        
+        /* ログ用 */
+        #log-area { font-size: 12px; color: #666; height: 40px; overflow: hidden; text-align: center; margin-bottom: 10px; font-weight: bold; }
+        .log-miss { color: #f44336; }
+        .log-hit { color: #2196f3; }
+        .log-gacha { color: #e91e63; }
+
+        /* イラスト通り：常時配置される強化ボタンエリア */
+        .upgrade-area { display: flex; justify-content: space-between; margin-bottom: 15px; border-top: 1px solid #ccc; padding-top: 10px; }
+        .upgrade-btn { width: 23%; height: 65px; border: 2px solid #333; border-radius: 10px; background-color: white; font-size: 11px; cursor: pointer; display: flex; flex-direction: column; align-items: center; justify-content: center; font-weight: bold; }
+        .upgrade-btn:hover { background-color: #f0f0f0; }
+        .upgrade-btn:disabled { background-color: #e0e0e0; color: #999; cursor: not-allowed; }
+        
+        /* イラスト通り：最下部のタブエリア */
+        .tab-area { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 5px; }
+        .tab-btn { width: 30%; height: 38px; border: 2px solid #333; border-radius: 20px; background-color: white; font-size: 11px; cursor: pointer; font-weight: bold; }
+        .tab-btn:hover { background-color: #f0f0f0; }
+
+        /* ★新設計：タブを押した時だけ強化ボタンの上に飛び出す「メニューウィンドウ」 */
+        #menu-window { display: none; border: 3px solid #333; border-radius: 10px; padding: 10px; height: 180px; margin-bottom: 15px; overflow-y: auto; background-color: #fff; box-shadow: 0 4px 10px rgba(0,0,0,0.1); }
+        .panel-content { display: none; }
+        .panel-content.active { display: block; }
+        .close-window-btn { float: right; background-color: #333; color: white; border: none; border-radius: 5px; padding: 2px 8px; font-size: 11px; cursor: pointer; }
+
+        /* ガチャ用スタイル */
+        .gacha-row { display: flex; justify-content: space-between; align-items: center; padding: 6px 0; border-bottom: 1px dashed #ccc; }
+        .gacha-btn { padding: 5px 10px; font-size: 11px; font-weight: bold; background-color: #e91e63; color: white; border: 1px solid #333; border-radius: 5px; cursor: pointer; }
+        .gacha-btn:disabled { background-color: #ccc; cursor: not-allowed; }
+        .list-item { font-size: 11px; padding: 4px; border-bottom: 1px solid #eee; }
+    </style>
+</head>
+<body>
+
+<div id="game-container">
+    <div class="top-bar">
+        <div>メニュー</div>
+        <div id="stage-display">ステージ 1 (0/5)</div>
+        <div id="money-display">お金: 0</div>
+    </div>
+
+    <div id="enemy-area">
+        <h2 style="margin:0; font-size: 20px;">てき (スライム)</h2>
+        <div id="enemy-hp-text">HP: 50 / 50</div>
+        <div id="enemy-hp-bar"><div id="enemy-hp-fill"></div></div>
+    </div>
+    
+    <div id="hit-requirement-display">このステージの必要命中値: 10</div>
+    
+    <div id="log-area">ここに攻撃のログが出ます</div>
+
+    <div class="char-area">
+        <div id="char1-display" class="char-slot active-char">キャラ1</div>
+        <div id="char2-display" class="char-slot">キャラ2<br>(未編成)</div>
+        <div id="char3-display" class="char-slot">キャラ3<br>(未編成)</div>
+    </div>
+
+    <div id="menu-window">
+        <button class="close-window-btn" onclick="closeMenuWindow()">✕ 閉じる</button>
+        
+        <div id="content-chars" class="panel-content">
+            <h4 style="margin:0 0 5px 0; color:#2196f3;">🐱 所持キャラクター</h4>
+            <div id="char-list-container"></div>
+        </div>
+
+        <div id="content-equip" class="panel-content">
+            <h4 style="margin:0 0 5px 0; color:#2196f3;">🗡️ 現在の装備武器</h4>
+            <div id="current-weapon-display" style="font-size:13px; font-weight:bold; color:#ff9800;">現在の武器: なし</div>
+            <p style="font-size:10px; color:#666; margin-top:5px;">※ガチャで引いた一番強い武器の攻撃力が、全キャラの攻撃に上乗せされます。</p>
+        </div>
+
+        <div id="content-reborn" class="panel-content">
+            <h4 style="margin:0 0 5px 0; color:#2196f3;">🌀 転生システム</h4>
+            <p style="font-size:12px; color:#333; margin-top:10px;">ステージ進行度に応じて転生ポイントを獲得し、強くてニューゲームができます。（次のステップで実装！）</p>
+        </div>
+
+        <div id="content-treasure" class="panel-content">
+            <h4 style="margin:0 0 5px 0; color:#2196f3;">🏆 集めたお宝の効果</h4>
+            <div id="treasure-effects-display" style="font-size:11px; line-height: 1.4; font-weight:bold; background:#e3f2fd; padding:5px; border-radius:5px;">
+                ・お宝攻撃倍率: +0% / ・お宝お金倍率: +0%
+            </div>
+            <div id="treasure-list-container" style="margin-top: 8px;"></div>
+        </div>
+
+        <div id="content-gacha" class="panel-content">
+            <h4 style="margin:0 0 5px 0; color:#e91e63;">🎁 プレミアムガチャ</h4>
+            <div class="gacha-row">
+                <div><span style="font-size:11px; font-weight:bold;">🗡️ 武器ガチャ</span> (単発: 100)</div>
+                <button id="gacha-wpn-btn" class="gacha-btn" onclick="drawGacha('weapon')">引く</button>
+            </div>
+            <div class="gacha-row">
+                <div><span style="font-size:11px; font-weight:bold;">🐱 キャラガチャ</span> (単発: 150)</div>
+                <button id="gacha-chr-btn" class="gacha-btn" onclick="drawGacha('character')">引く</button>
+            </div>
+            <div class="gacha-row">
+                <div><span style="font-size:11px; font-weight:bold;">🏆 お宝ガチャ</span> (単発: 200)</div>
+                <button id="gacha-trs-btn" class="gacha-btn" onclick="drawGacha('treasure')">引く</button>
+            </div>
+        </div>
+
+        <div id="content-shop" class="panel-content">
+            <h4 style="margin:0 0 5px 0; color:#2196f3;">🛒 ショップ</h4>
+            <p style="text-align:center; color:#999; font-size:12px; margin-top:20px;">ショップ（今後実装予定）</p>
+        </div>
+    </div>
+
+    <div class="upgrade-area">
+        <button id="btn-atk" class="upgrade-btn" onclick="buyUpgrade('atk')">攻撃力<br>Lv.1<br>コスト: 10</button>
+        <button id="btn-spd" class="upgrade-btn" onclick="buyUpgrade('spd')">攻撃速度<br>Lv.1<br>コスト: 15</button>
+        <button id="btn-hit" class="upgrade-btn" onclick="buyUpgrade('hit') text">命中<br>数値: 10<br>コスト: 12</button>
+        <button id="btn-money" class="upgrade-btn" onclick="buyUpgrade('money')">お金<br>Lv.1<br>コスト: 20</button>
+    </div>
+
+    <div class="tab-area">
+        <button class="tab-btn" onclick="openMenuWindow('chars')">キャラ一覧</button>
+        <button class="tab-btn" onclick="openMenuWindow('equip')">装備一覧</button>
+        <button class="tab-btn" onclick="openMenuWindow('reborn')">転生</button>
+        <button class="tab-btn" onclick="openMenuWindow('treasure')">お宝</button>
+        <button class="tab-btn" onclick="openMenuWindow('gacha')">ガチャ</button>
+        <button class="tab-btn" onclick="openMenuWindow('shop')">ショップ</button>
+    </div>
+</div>
+
+<script>
+    // --- データ定義 ---
+    let money = 0;
+    let stage = 1;
+    let killsInStage = 0;
+    let enemy = { maxHp: 50, hp: 50 };
+
+    let upgradeAtkMult = 1.0;
+    let upgradeSpdBonus = 0.0;
+    let upgradeMoneyMult = 1.0;
+    let playerHitValue = 10;
+
+    const costs = { weapon: 100, character: 150, treasure: 200 };
+
+    // 武器データ
+    let currentWeapon = { name: "なし", attack: 0 };
+    const weaponList = [
+        { name: "銅のつるぎ", attack: 15 },
+        { name: "鉄のつるぎ", attack: 60 },
+        { name: "伝説の聖剣", attack: 300 }
+    ];
+
+    // キャラクターデータ
+    let activeParty = [
+        { name: "ノーマル猫", baseAtk: 10, atkMult: 1.0, spd: 1.0 }, 
+        null, null  
+    ];
+    let ownedCharacters = [
+        { name: "ノーマル猫", baseAtk: 10, atkMult: 1.0, spd: 1.0, count: 1 }
+    ];
+    const characterPool = [
+        { name: "アーミー犬", baseAtk: 15, atkMult: 1.5, spd: 1.2 },
+        { name: "忍者キャット", baseAtk: 25, atkMult: 2.0, spd: 1.8 },
+        { name: "サイバー猫", baseAtk: 50, atkMult: 3.0, spd: 2.5 }
+    ];
+
+    // お宝データ
+    let treasureEffects = { atkBonus: 0.0, moneyBonus: 0.0 };
+    let ownedTreasures = {};
+    const treasurePool = [
+        { id: "gold_cat", name: "招き猫の像", type: "money", effect: 0.3, desc: "お金倍率+30%" },
+        { id: "hero_badge", name: "勇者のバッジ", type: "atk", effect: 0.2, desc: "攻撃倍率+20%" },
+        { id: "god_orb", name: "神のオーブ", type: "atk", effect: 1.0, desc: "攻撃倍率+100%" }
+    ];
+
+    let upgrades = {
+        atk:   { lv: 1, cost: 10, scale: 1.2, bonus: 0.2 },   
+        spd:   { lv: 1, cost: 15, scale: 1.25, bonus: 0.1 },  
+        hit:   { lv: 1, cost: 12, scale: 1.2, bonus: 5 },    
+        money: { lv: 1, cost: 20, scale: 1.3, bonus: 0.5 },   
+    };
+
+    // UI要素の取得
+    const uiEnemyHpText = document.getElementById('enemy-hp-text');
+    const uiEnemyHpFill = document.getElementById('enemy-hp-fill');
+    const uiMoneyDisplay = document.getElementById('money-display');
+    const uiLogArea = document.getElementById('log-area');
+    const uiStageDisplay = document.getElementById('stage-display');
+    const uiHitReqDisplay = document.getElementById('hit-requirement-display');
+
+    // --- 自動攻撃処理 ---
+    function performCharacterAttack(charIndex) {
+        let char = activeParty[charIndex];
+        if (!char) return;
+
+        let reqHit = 10 + (stage - 1) * 15;
+        let isHit = (playerHitValue >= reqHit) ? true : (Math.random() < 0.3);
+
+        if (isHit) {
+            let totalAtkMult = char.atkMult * upgradeAtkMult * (1.0 + treasureEffects.atkBonus);
+            let damage = Math.floor((char.baseAtk + currentWeapon.attack) * totalAtkMult);
+            enemy.hp -= damage;
+            uiLogArea.innerHTML = `<span class="log-hit">HIT!</span> [キャラ${charIndex+1}]${char.name}が ${damage} ダメージ！`;
+            if (enemy.hp <= 0) enemyDefeated();
+        } else {
+            uiLogArea.innerHTML = `<span class="log-miss">MISS!</span> [キャラ${charIndex+1}] 攻撃が外れた！`;
+        }
+        updateUI();
+    }
+
+    function enemyDefeated() {
+        let totalMoneyMult = upgradeMoneyMult * (1.0 + treasureEffects.moneyBonus);
+        let earnedMoney = Math.floor((10 * stage) * totalMoneyMult);
+        money += earnedMoney;
+        uiLogArea.innerText = `敵を倒した！ お金を ${earnedMoney} 獲得！`;
+
+        killsInStage++;
+        if (killsInStage >= 5) { stage++; killsInStage = 0; }
+        enemy.maxHp = Math.floor(50 * Math.pow(1.35, stage - 1));
+        enemy.hp = enemy.maxHp;
+    }
+
+    // --- ガチャ処理 ---
+    function drawGacha(gachaType) {
+        let cost = costs[gachaType];
+        if (money < cost) return;
+        money -= cost;
+        let rand = Math.random() * 100;
+
+        if (gachaType === 'weapon') {
+            let selected = rand < 5 ? weaponList[2] : (rand < 30 ? weaponList[1] : weaponList[0]);
+            let autoEquip = "";
+            if (selected.attack > currentWeapon.attack) { currentWeapon = selected; autoEquip = "（自動装備！）"; }
+            uiLogArea.innerHTML = `<span class="log-gacha">🎁 武器:</span> 「${selected.name}(+${selected.attack})」 ${autoEquip}`;
+        } else if (gachaType === 'character') {
+            let selected = rand < 5 ? characterPool[2] : (rand < 30 ? characterPool[1] : characterPool[0]);
+            let alreadyOwned = ownedCharacters.find(c => c.name === selected.name);
+            if (alreadyOwned) alreadyOwned.count++; else ownedCharacters.push({ ...selected, count: 1 });
+
+            let autoDeploy = "";
+            if (!activeParty[1]) { activeParty[1] = { ...selected }; autoDeploy = "（キャラ2に編成！）"; startCharTimer(1); }
+            else if (!activeParty[2]) { activeParty[2] = { ...selected }; autoDeploy = "（キャラ3に編成！）"; startCharTimer(2); }
+
+            uiLogArea.innerHTML = `<span class="log-gacha">🎁 キャラ:</span> 「${selected.name}」 ${autoDeploy}`;
+            rebuildCharListUI();
+        } else if (gachaType === 'treasure') {
+            let selected = rand < 5 ? treasurePool[2] : (rand < 30 ? treasurePool[1] : treasurePool[0]);
+            if (ownedTreasures[selected.id]) ownedTreasures[selected.id].count++; else ownedTreasures[selected.id] = { ...selected, count: 1 };
+            recalculateTreasureEffects();
+            uiLogArea.innerHTML = `<span class="log-gacha">🎁 お宝:</span> 「${selected.name}」 (${selected.desc})`;
+            rebuildTreasureUI();
+        }
+        updateUI();
+    }
+
+    function recalculateTreasureEffects() {
+        treasureEffects.atkBonus = 0; treasureEffects.moneyBonus = 0;
+        for (let id in ownedTreasures) {
+            let t = ownedTreasures[id];
+            if (t.type === 'atk') treasureEffects.atkBonus += (t.effect * t.count);
+            if (t.type === 'money') treasureEffects.moneyBonus += (t.effect * t.count);
+        }
+    }
+
+    // タイマー管理
+    let charTimers = [null, null, null];
+    function startCharTimer(index) {
+        if (charTimers[index]) clearInterval(charTimers[index]);
+        if (!activeParty[index]) return;
+        let totalSpd = activeParty[index].spd + upgradeSpdBonus;
+        charTimers[index] = setInterval(() => performCharacterAttack(index), 1000 / totalSpd);
+    }
+
+    // 常時強化ボタン
+    function buyUpgrade(type) {
+        let up = upgrades[type];
+        if (money >= up.cost) {
+            money -= up.cost; up.lv++; up.cost = Math.floor(up.cost * up.scale);
+            if (type === 'atk') upgradeAtkMult = 1.0 + (up.lv - 1) * up.bonus;
+            else if (type === 'spd') { upgradeSpdBonus = (up.lv - 1) * up.bonus; for(let i=0; i<3; i++) startCharTimer(i); }
+            else if (type === 'hit') playerHitValue = 10 + (up.lv - 1) * up.bonus;
+            else if (type === 'money') upgradeMoneyMult = 1.0 + (up.lv - 1) * up.bonus;
+            uiLogArea.innerText = `アップグレード成功！`;
+            updateUI();
+        }
+    }
+
+    // ★新設：メニューウィンドウを開く処理
+    function openMenuWindow(tabName) {
+        document.getElementById('menu-window').style.display = 'block';
+        const contents = document.querySelectorAll('.panel-content');
+        contents.forEach(c => c.classList.remove('active'));
+        document.getElementById(`content-${tabName}`).classList.add('active');
+    }
+
+    // ★新設：メニューウィンドウを閉じる処理
+    function closeMenuWindow() {
+        document.getElementById('menu-window').style.display = 'none';
+    }
+
+    function rebuildCharListUI() {
+        let container = document.getElementById('char-list-container');
+        container.innerHTML = "";
+        ownedCharacters.forEach(c => {
+            container.innerHTML += `<div class="list-item">■ <b>${c.name}</b> (所持数:${c.count})<br><span style="color:#666;font-size:10px;">基礎ATK:${c.baseAtk} / 倍率:x${c.atkMult} / 速度:${c.spd}</span></div>`;
+        });
+    }
+
+    function rebuildTreasureUI() {
+        document.getElementById('treasure-effects-display').innerHTML = `・お宝攻撃倍率: +${(treasureEffects.atkBonus*100).toFixed(0)}%<br>・お宝お金倍率: +${(treasureEffects.moneyBonus*100).toFixed(0)}%`;
+        let container = document.getElementById('treasure-list-container');
+        container.innerHTML = "";
+        for (let id in ownedTreasures) {
+            let t = ownedTreasures[id];
+            container.innerHTML += `<div class="list-item">🏆 <b>${t.name}</b> x${t.count} (${t.desc})</div>`;
+        }
+    }
+
+    // UIの更新
+    function updateUI() {
+        uiMoneyDisplay.innerText = `お金: ${money}`;
+        uiStageDisplay.innerText = `ステージ ${stage} (${killsInStage}/5)`;
+        let displayHp = Math.max(0, enemy.hp);
+        uiEnemyHpText.innerText = `HP: ${displayHp} / ${enemy.maxHp}`;
+        uiEnemyHpFill.style.width = `${(displayHp / enemy.maxHp) * 100}%`;
+
+        let reqHit = 10 + (stage - 1) * 15;
+        uiHitReqDisplay.innerText = `このステージの必要命中値: ${reqHit} (あなたの命中: ${playerHitValue})`;
+
+        for(let i=0; i<3; i++) {
+            let slot = document.getElementById(`char${i+1}-display`);
+            let char = activeParty[i];
+            if (char) {
+                let totalAtkMult = char.atkMult * upgradeAtkMult * (1.0 + treasureEffects.atkBonus);
+                let currentDamage = Math.floor((char.baseAtk + currentWeapon.attack) * totalAtkMult);
+                slot.className = "char-slot active-char";
+                slot.innerHTML = `キャラ${i+1}<br><span style="color:#1565c0">${char.name}</span><br>Dmg: ${currentDamage}`;
+            } else {
+                slot.className = "char-slot"; slot.innerHTML = `キャラ${i+1}<br>(未編成)`;
+            }
+        }
+
+        document.getElementById('current-weapon-display').innerText = `現在の武器: ${currentWeapon.name} (攻撃力+${currentWeapon.attack})`;
+
+        document.getElementById('btn-atk').innerHTML = `攻撃力<br>Lv.${upgrades.atk.lv}<br>コスト: ${upgrades.atk.cost}`;
+        document.getElementById('btn-atk').disabled = (money < upgrades.atk.cost);
+        document.getElementById('btn-spd').innerHTML = `攻撃速度<br>Lv.${upgrades.spd.lv}<br>コスト: ${upgrades.spd.cost}`;
+        document.getElementById('btn-spd').disabled = (money < upgrades.spd.cost);
+        document.getElementById('btn-hit').innerHTML = `命中<br>数値: ${playerHitValue}<br>コスト: ${upgrades.hit.cost}`;
+        document.getElementById('btn-hit').disabled = (money < upgrades.hit.cost);
+        document.getElementById('btn-money').innerHTML = `お金<br>Lv.${upgrades.money.lv}<br>コスト: ${upgrades.money.cost}`;
+        document.getElementById('btn-money').disabled = (money < upgrades.money.cost);
+
+        document.getElementById('gacha-wpn-btn').disabled = (money < costs.weapon);
+        document.getElementById('gacha-chr-btn').disabled = (money < costs.character);
+        document.getElementById('gacha-trs-btn').disabled = (money < costs.treasure);
+    }
+
+    startCharTimer(0);
+    rebuildCharListUI();
+    updateUI();
+</script>
+</body>
+</html>
