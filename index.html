@@ -1,0 +1,478 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>放置インフレゲーム - プロトタイプ</title>
+    <style>
+        body { font-family: sans-serif; background-color: #f0f0f0; margin: 0; padding: 20px; display: flex; justify-content: center; }
+        #game-container { width: 400px; background-color: white; border: 2px solid #333; border-radius: 10px; padding: 10px; box-sizing: border-box; position: relative; }
+        
+        /* 上部UI */
+        .top-bar { display: flex; justify-content: space-between; margin-bottom: 10px; font-weight: bold; }
+        
+        /* 敵エリア */
+        #enemy-area { height: 160px; display: flex; flex-direction: column; align-items: center; justify-content: center; margin-bottom: 5px; }
+        .enemy-image { height: 110px; object-fit: contain; filter: drop-shadow(0px 8px 6px rgba(0,0,0,0.3)); transition: transform 0.1s; }
+        .enemy-image.hit { transform: scale(0.9) rotate(-3deg); filter: brightness(2) drop-shadow(0px 8px 6px rgba(255,0,0,0.5)); }
+        
+        #enemy-hp-bar { width: 80%; height: 15px; background-color: #ddd; border-radius: 10px; overflow: hidden; margin-top: 5px; border: 1px solid #999; }
+        #enemy-hp-fill { width: 100%; height: 100%; background-color: #f44336; transition: width 0.1s; }
+        #enemy-hp-text { font-size: 14px; font-weight: bold; text-shadow: 1px 1px 2px white; margin-top: 5px; }
+        
+        /* 命中情報の表示 */
+        #hit-requirement-display { text-align: center; font-size: 11px; color: #d32f2f; font-weight: bold; margin-bottom: 10px; }
+        
+        /* 味方キャラエリア */
+        .char-area { display: flex; justify-content: space-around; border: 2px solid #333; padding: 10px; border-radius: 10px; margin-bottom: 15px; background-color: #f9f9f9; }
+        .char-slot { width: 100px; height: 110px; border: 2px dashed #999; border-radius: 10px; display: flex; flex-direction: column; align-items: center; justify-content: center; font-size: 10px; text-align: center; background-color: #fafafa; box-sizing: border-box; padding: 5px; }
+        .active-char { border: 2px solid #2196f3; background-color: #e3f2fd; font-weight: bold; }
+        
+        /* 味方・武器の画像用スタイル */
+        .ui-display-img { width: 50px; height: 50px; object-fit: contain; margin-bottom: 3px; filter: drop-shadow(0px 3px 2px rgba(0,0,0,0.2)); }
+        .weapon-list-img { width: 40px; height: 40px; object-fit: contain; vertical-align: middle; margin-right: 10px; }
+
+        /* ログ用 */
+        #log-area { font-size: 12px; color: #666; height: 40px; overflow: hidden; text-align: center; margin-bottom: 10px; font-weight: bold; }
+        .log-miss { color: #f44336; }
+        .log-hit { color: #2196f3; }
+        .log-gacha { color: #e91e63; }
+        .log-reborn { color: #9c27b0; }
+
+        /* 常時配置される強化ボタンエリア */
+        .upgrade-area { display: flex; justify-content: space-between; margin-bottom: 15px; border-top: 1px solid #ccc; padding-top: 10px; }
+        .upgrade-btn { 
+            width: 23%; height: 65px; border: 2px solid #2e7d32; border-radius: 10px; background-color: #4caf50; color: white; font-size: 11px; 
+            cursor: pointer; display: flex; flex-direction: column; align-items: center; justify-content: center; font-weight: bold; 
+            box-shadow: 0 2px 4px rgba(0,0,0,0.15); transition: background-color 0.1s;
+        }
+        .upgrade-btn:hover { background-color: #43a047; }
+        .upgrade-btn:disabled { background-color: #e0e0e0; color: #888888; border-color: #ababab; cursor: not-allowed; box-shadow: none; }
+        
+        /* 最下部のタブエリア */
+        .tab-area { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 5px; }
+        .tab-btn { width: 30%; height: 38px; border: 2px solid #333; border-radius: 20px; background-color: white; font-size: 11px; cursor: pointer; font-weight: bold; }
+        .tab-btn:hover { background-color: #f0f0f0; }
+
+        /* タブメニューウィンドウ */
+        #menu-window { display: none; border: 3px solid #333; border-radius: 10px; padding: 10px; height: 180px; margin-bottom: 15px; overflow-y: auto; background-color: #fff; box-shadow: 0 4px 10px rgba(0,0,0,0.1); }
+        .panel-content { display: none; }
+        .panel-content.active { display: block; }
+        .close-window-btn { float: right; background-color: #333; color: white; border: none; border-radius: 5px; padding: 2px 8px; font-size: 11px; cursor: pointer; }
+
+        /* ガチャ・転生用スタイル */
+        .gacha-row { display: flex; justify-content: space-between; align-items: center; padding: 6px 0; border-bottom: 1px dashed #ccc; }
+        .gacha-btn { padding: 5px 10px; font-size: 11px; font-weight: bold; background-color: #e91e63; color: white; border: 1px solid #333; border-radius: 5px; cursor: pointer; }
+        .gacha-btn:disabled { background-color: #ccc; cursor: not-allowed; }
+        
+        .reborn-upgrade-btn { padding: 4px 8px; font-size: 10px; font-weight: bold; background-color: #9c27b0; color: white; border: 1px solid #333; border-radius: 4px; cursor: pointer; }
+        .reborn-upgrade-btn:disabled { background-color: #ccc; cursor: not-allowed; }
+        
+        .list-item { font-size: 11px; padding: 4px; border-bottom: 1px solid #eee; }
+    </style>
+</head>
+<body>
+
+<div id="game-container">
+    <div class="top-bar">
+        <div>メニュー</div>
+        <div id="stage-display">ステージ 1 (0/5)</div>
+        <div id="money-display">お金: 0</div>
+    </div>
+
+    <div id="enemy-area">
+        <img src="images/001.png" alt="スライム" class="enemy-image" id="enemy-img">
+        <div id="enemy-hp-bar"><div id="enemy-hp-fill"></div></div>
+        <div id="enemy-hp-text">HP: 50 / 50</div>
+    </div>
+    
+    <div id="hit-requirement-display">このステージの必要命中値: 10</div>
+    
+    <div id="log-area">ここに攻撃のログが出ます</div>
+
+    <div class="char-area">
+        <div id="char1-display" class="char-slot active-char">キャラ1</div>
+        <div id="char2-display" class="char-slot">キャラ2<br>(未編成)</div>
+        <div id="char3-display" class="char-slot">キャラ3<br>(未編成)</div>
+    </div>
+
+    <div id="menu-window">
+        <button class="close-window-btn" onclick="closeMenuWindow()">✕ 閉じる</button>
+        
+        <div id="content-chars" class="panel-content">
+            <h4 style="margin:0 0 5px 0; color:#2196f3;">🐱 所持キャラクター</h4>
+            <div id="char-list-container"></div>
+        </div>
+
+        <div id="content-equip" class="panel-content">
+            <h4 style="margin:0 0 5px 0; color:#2196f3;">🗡️ 現在の装備武器</h4>
+            <div id="current-weapon-container" style="display:flex; align-items:center; background:#fffde7; padding:5px; border-radius:5px; border:1px solid #ffe082;"></div>
+            <p style="font-size:10px; color:#666; margin-top:5px;">※ガチャで引いた一番強い武器の攻撃力が、全キャラの攻撃に上乗せされます。</p>
+        </div>
+
+        <div id="content-reborn" class="panel-content">
+            <h4 style="margin:0 0 5px 0; color:#9c27b0;">🌀 転生システム</h4>
+            <div id="reborn-info-text" style="font-size:11px; color:#333; margin:5px 0; font-weight:bold; background:#f3e5f5; padding:5px; border-radius:5px;"></div>
+            <button id="reborn-execute-btn" style="width:100%; padding: 6px; background: #9c27b0; color: white; border: 1px solid #333; border-radius: 5px; font-weight: bold; cursor: pointer; margin-bottom:10px;" onclick="executeReborn()">転生を実行する（進行度リセット）</button>
+            
+            <div style="font-size:11px; font-weight:bold; border-top:1px solid #ccc; padding-top:5px;">✨ ポイント消費で永続強化：</div>
+            <div class="gacha-row" style="padding:4px 0;"><div id="rb-lbl-atk" style="font-size:10px;">基礎ATK: +0 (Lv.0)</div><button id="rb-btn-atk" class="reborn-upgrade-btn" onclick="buyRebornUpgrade('atk')">強化 (1P)</button></div>
+            <div class="gacha-row" style="padding:4px 0;"><div id="rb-lbl-mult" style="font-size:10px;">攻撃倍率: +0% (Lv.0)</div><button id="rb-btn-mult" class="reborn-upgrade-btn" onclick="buyRebornUpgrade('mult')">強化 (1P)</button></div>
+            <div class="gacha-row" style="padding:4px 0;"><div id="rb-lbl-spd" style="font-size:10px;">速度倍率: +0% (Lv.0)</div><button id="rb-btn-spd" class="reborn-upgrade-btn" onclick="buyRebornUpgrade('spd')">強化 (1P)</button></div>
+            <div class="gacha-row" style="padding:4px 0;"><div id="rb-lbl-hit" style="font-size:10px;">永続命中: +0 (Lv.0)</div><button id="rb-btn-hit" class="reborn-upgrade-btn" onclick="buyRebornUpgrade('hit')">強化 (1P)</button></div>
+            <div class="gacha-row" style="padding:4px 0;"><div id="rb-lbl-money" style="font-size:10px;">お金倍率: +0% (Lv.0)</div><button id="rb-btn-money" class="reborn-upgrade-btn" onclick="buyRebornUpgrade('money')">強化 (1P)</button></div>
+            <div class="gacha-row" style="padding:4px 0;"><div id="rb-lbl-skip" style="font-size:10px;">スキップ率: +0% (Lv.0)</div><button id="rb-btn-skip" class="reborn-upgrade-btn" onclick="buyRebornUpgrade('skip')">強化 (1P)</button></div>
+        </div>
+
+        <div id="content-treasure" class="panel-content">
+            <h4 style="margin:0 0 5px 0; color:#2196f3;">🏆 集めたお宝の効果</h4>
+            <div id="treasure-effects-display" style="font-size:11px; line-height: 1.4; font-weight:bold; background:#e3f2fd; padding:5px; border-radius:5px;">
+                ・お宝攻撃倍率: +0% / ・お宝お金倍率: +0%
+            </div>
+            <div id="treasure-list-container" style="margin-top: 8px;"></div>
+        </div>
+
+        <div id="content-gacha" class="panel-content">
+            <h4 style="margin:0 0 5px 0; color:#e91e63;">🎁 プレミアムガチャ</h4>
+            <div class="gacha-row">
+                <div><span style="font-size:11px; font-weight:bold;">🗡️ 武器ガチャ</span> (単発: 100)</div>
+                <button id="gacha-wpn-btn" class="gacha-btn" onclick="drawGacha('weapon')">引く</button>
+            </div>
+            <div class="gacha-row">
+                <div><span style="font-size:11px; font-weight:bold;">🐱 キャラガチャ</span> (単発: 150)</div>
+                <button id="gacha-chr-btn" class="gacha-btn" onclick="drawGacha('character')">引く</button>
+            </div>
+            <div class="gacha-row">
+                <div><span style="font-size:11px; font-weight:bold;">🏆 お宝ガチャ</span> (単発: 200)</div>
+                <button id="gacha-trs-btn" class="gacha-btn" onclick="drawGacha('treasure')">引く</button>
+            </div>
+        </div>
+
+        <div id="content-shop" class="panel-content">
+            <h4 style="margin:0 0 5px 0; color:#2196f3;">🛒 ショップ</h4>
+            <p style="text-align:center; color:#999; font-size:12px; margin-top:20px;">ショップ（今後実装予定）</p>
+        </div>
+    </div>
+
+    <div class="upgrade-area">
+        <button id="btn-atk" class="upgrade-btn" onclick="buyUpgrade('atk')">攻撃力<br>Lv.1<br>コスト: 10</button>
+        <button id="btn-spd" class="upgrade-btn" onclick="buyUpgrade('spd')">攻撃速度<br>Lv.1<br>コスト: 15</button>
+        <button id="btn-hit" class="upgrade-btn" onclick="buyUpgrade('hit')">命中<br>数値: 10<br>コスト: 12</button>
+        <button id="btn-money" class="upgrade-btn" onclick="buyUpgrade('money')">お金<br>Lv.1<br>コスト: 20</button>
+    </div>
+
+    <div class="tab-area">
+        <button class="tab-btn" onclick="openMenuWindow('chars')">キャラ一覧</button>
+        <button class="tab-btn" onclick="openMenuWindow('equip')">装備一覧</button>
+        <button class="tab-btn" onclick="openMenuWindow('reborn')">転生</button>
+        <button class="tab-btn" onclick="openMenuWindow('treasure')">お宝</button>
+        <button class="tab-btn" onclick="openMenuWindow('gacha')">ガチャ</button>
+        <button class="tab-btn" onclick="openMenuWindow('shop')">ショップ</button>
+    </div>
+</div>
+
+<script>
+    // --- データ定義 ---
+    let money = 0;
+    let stage = 1;
+    let killsInStage = 0;
+    let enemy = { maxHp: 50, hp: 50 };
+
+    let upgradeAtkMult = 1.0;
+    let upgradeSpdBonus = 0.0;
+    let upgradeMoneyMult = 1.0;
+    let playerHitValue = 10;
+
+    let rebornPoints = 0;
+    let rbUpgrades = {
+        atk:   { lv: 0, bonus: 5 },   
+        mult:  { lv: 0, bonus: 0.5 }, 
+        spd:   { lv: 0, bonus: 0.2 }, 
+        hit:   { lv: 0, bonus: 20 },  
+        money: { lv: 0, bonus: 0.5 },
+        skip:  { lv: 0, bonus: 0.02 }
+    };
+
+    const costs = { weapon: 100, character: 150, treasure: 200 };
+
+    // ★進化：画像パスをすべて images/ フォルダ経由に書き換えました
+    let currentWeapon = { name: "なし", attack: 0, image: "images/w_none.png" };
+    const weaponList = [
+        { name: "銅のつるぎ", attack: 15, image: "images/w_bronze.png" },
+        { name: "鉄のつるぎ", attack: 60, image: "images/w_iron.png" },
+        { name: "伝説の聖剣", attack: 300, image: "images/w_legend.png" }
+    ];
+
+    let activeParty = [
+        { name: "ノーマル猫", baseAtk: 10, atkMult: 1.0, spd: 1.0, image: "images/c_normal.png" }, 
+        null, null  
+    ];
+    let ownedCharacters = [
+        { name: "ノーマル猫", baseAtk: 10, atkMult: 1.0, spd: 1.0, count: 1, image: "images/c_normal.png" }
+    ];
+    const characterPool = [
+        { name: "アーミー犬", baseAtk: 15, atkMult: 1.5, spd: 1.2, image: "images/c_dog.png" },
+        { name: "忍者キャット", baseAtk: 25, atkMult: 2.0, spd: 1.8, image: "images/c_ninja.png" },
+        { name: "サイバー猫", baseAtk: 50, atkMult: 3.0, spd: 2.5, image: "images/c_cyber.png" }
+    ];
+
+    // お宝データ
+    let treasureEffects = { atkBonus: 0.0, moneyBonus: 0.0 };
+    let ownedTreasures = {};
+    const treasurePool = [
+        { id: "gold_cat", name: "招き猫の像", type: "money", effect: 0.3, desc: "お金倍率+30%" },
+        { id: "hero_badge", name: "勇者のバッジ", type: "atk", effect: 0.2, desc: "攻撃倍率+20%" },
+        { id: "god_orb", name: "神のオーブ", type: "atk", effect: 1.0, desc: "攻撃倍率+100%" }
+    ];
+
+    let upgrades = {
+        atk:   { lv: 1, cost: 10, scale: 1.2, bonus: 0.2 },   
+        spd:   { lv: 1, cost: 15, scale: 1.25, bonus: 0.1 },  
+        hit:   { lv: 1, cost: 12, scale: 1.2, bonus: 5 },    
+        money: { lv: 1, cost: 20, scale: 1.3, bonus: 0.5 },   
+    };
+
+    const uiEnemyHpText = document.getElementById('enemy-hp-text');
+    const uiEnemyHpFill = document.getElementById('enemy-hp-fill');
+    const uiMoneyDisplay = document.getElementById('money-display');
+    const uiLogArea = document.getElementById('log-area');
+    const uiStageDisplay = document.getElementById('stage-display');
+    const uiHitReqDisplay = document.getElementById('hit-requirement-display');
+    const uiEnemyImg = document.getElementById('enemy-img');
+
+    function playDamageAnim() {
+        uiEnemyImg.classList.add('hit');
+        setTimeout(() => { uiEnemyImg.classList.remove('hit'); }, 100);
+    }
+
+    // --- 自動攻撃処理 ---
+    function performCharacterAttack(charIndex) {
+        let char = activeParty[charIndex];
+        if (!char) return;
+
+        let reqHit = 10 + (stage - 1) * 15;
+        if (playerHitValue >= reqHit || Math.random() < 0.3) {
+            let finalBaseAtk = char.baseAtk + currentWeapon.attack + (rbUpgrades.atk.lv * rbUpgrades.atk.bonus);
+            let finalMultiplier = char.atkMult * upgradeAtkMult * (1.0 + treasureEffects.atkBonus + (rbUpgrades.mult.lv * rbUpgrades.mult.bonus));
+            
+            let damage = Math.floor(finalBaseAtk * finalMultiplier);
+            enemy.hp -= damage;
+            uiLogArea.innerHTML = `<span class="log-hit">HIT!</span> [キャラ${charIndex+1}]${char.name}が ${damage} ダメージ！`;
+            playDamageAnim();
+            if (enemy.hp <= 0) enemyDefeated();
+        } else {
+            uiLogArea.innerHTML = `<span class="log-miss">MISS!</span> [キャラ${charIndex+1}] 攻撃が外れた！`;
+        }
+        updateUI();
+    }
+
+    function enemyDefeated() {
+        let finalMoneyMult = upgradeMoneyMult * (1.0 + treasureEffects.moneyBonus + (rbUpgrades.money.lv * rbUpgrades.money.bonus));
+        let earnedMoney = Math.floor((10 * stage) * finalMoneyMult);
+        money += earnedMoney;
+        uiLogArea.innerText = `敵を倒した！ お金を ${earnedMoney} 獲得！`;
+
+        let skipChance = rbUpgrades.skip.lv * rbUpgrades.skip.bonus; 
+        if (Math.random() < skipChance) {
+            stage++; killsInStage = 0;
+            uiLogArea.innerHTML += `<br><span style="color:#e91e63;">★スキップ発動！ステージ ${stage} へ！</span>`;
+        } else {
+            killsInStage++;
+            if (killsInStage >= 5) { stage++; killsInStage = 0; }
+        }
+        enemy.maxHp = Math.floor(50 * Math.pow(1.35, stage - 1));
+        enemy.hp = enemy.maxHp;
+    }
+
+    function executeReborn() {
+        let earnedPoints = Math.max(0, stage - 1); 
+        if (earnedPoints <= 0) { alert("ステージ2以上に進むと転生ポイントが貰えます！"); return; }
+        if (confirm(`本当に転生しますか？\n獲得ポイント: ${earnedPoints} P`)) {
+            rebornPoints += earnedPoints;
+            money = 0; stage = 1; killsInStage = 0;
+            upgrades.atk = { lv: 1, cost: 10, scale: 1.2, bonus: 0.2 };
+            upgrades.spd = { lv: 1, cost: 15, scale: 1.25, bonus: 0.1 };
+            upgrades.hit = { lv: 1, cost: 12, scale: 1.2, bonus: 5 };
+            upgrades.money = { lv: 1, cost: 20, scale: 1.3, bonus: 0.5 };
+            upgradeAtkMult = 1.0; upgradeSpdBonus = 0.0; upgradeMoneyMult = 1.0;
+            enemy.maxHp = 50; enemy.hp = 50;
+            for(let i=0; i<3; i++) startCharTimer(i);
+            uiLogArea.innerHTML = `<span class="log-reborn">🌀 転生しました！</span>`;
+            closeMenuWindow();
+            updateUI();
+        }
+    }
+
+    function buyRebornUpgrade(type) {
+        if (rebornPoints >= 1) {
+            rebornPoints -= 1; rbUpgrades[type].lv++;
+            if (type === 'spd') { for(let i=0; i<3; i++) startCharTimer(i); }
+            uiLogArea.innerHTML = `<span class="log-reborn">🌀 永続強化！</span>`;
+            updateUI();
+        }
+    }
+
+    function drawGacha(gachaType) {
+        let cost = costs[gachaType];
+        if (money < cost) return;
+        money -= cost;
+        let rand = Math.random() * 100;
+
+        if (gachaType === 'weapon') {
+            let selected = rand < 5 ? weaponList[2] : (rand < 30 ? weaponList[1] : weaponList[0]);
+            let autoEquip = "";
+            if (selected.attack > currentWeapon.attack) { currentWeapon = selected; autoEquip = "（自動装備！）"; }
+            uiLogArea.innerHTML = `<span class="log-gacha">🎁 武器:</span> 「${selected.name}(+${selected.attack})」 ${autoEquip}`;
+        } else if (gachaType === 'character') {
+            let selected = rand < 5 ? characterPool[2] : (rand < 30 ? characterPool[1] : characterPool[0]);
+            let alreadyOwned = ownedCharacters.find(c => c.name === selected.name);
+            if (alreadyOwned) alreadyOwned.count++; else ownedCharacters.push({ ...selected, count: 1 });
+
+            let autoDeploy = "";
+            if (!activeParty[1]) { activeParty[1] = { ...selected }; autoDeploy = "（キャラ2に編成！）"; startCharTimer(1); }
+            else if (!activeParty[2]) { activeParty[2] = { ...selected }; autoDeploy = "（キャラ3に編成！）"; startCharTimer(2); }
+
+            uiLogArea.innerHTML = `<span class="log-gacha">🎁 キャラ:</span> 「${selected.name}」 ${autoDeploy}`;
+            rebuildCharListUI();
+        } else if (gachaType === 'treasure') {
+            let selected = rand < 5 ? treasurePool[2] : (rand < 30 ? treasurePool[1] : treasurePool[0]);
+            if (ownedTreasures[selected.id]) ownedTreasures[selected.id].count++; else ownedTreasures[selected.id] = { ...selected, count: 1 };
+            recalculateTreasureEffects();
+            uiLogArea.innerHTML = `<span class="log-gacha">🎁 お宝:</span> 「${selected.name}」 (${selected.desc})`;
+            rebuildTreasureUI();
+        }
+        updateUI();
+    }
+
+    function recalculateTreasureEffects() {
+        treasureEffects.atkBonus = 0; treasureEffects.moneyBonus = 0;
+        for (let id in ownedTreasures) {
+            let t = ownedTreasures[id];
+            if (t.type === 'atk') treasureEffects.atkBonus += (t.effect * t.count);
+            if (t.type === 'money') treasureEffects.moneyBonus += (t.effect * t.count);
+        }
+    }
+
+    function startCharTimer(index) {
+        if (charTimers[index]) clearInterval(charTimers[index]);
+        if (!activeParty[index]) return;
+        let totalSpd = activeParty[index].spd + upgradeSpdBonus + (rbUpgrades.spd.lv * rbUpgrades.spd.bonus);
+        charTimers[index] = setInterval(() => performCharacterAttack(index), 1000 / totalSpd);
+    }
+
+    function buyUpgrade(type) {
+        let up = upgrades[type];
+        if (money >= up.cost) {
+            money -= up.cost; up.lv++; up.cost = Math.floor(up.cost * up.scale);
+            if (type === 'atk') upgradeAtkMult = 1.0 + (up.lv - 1) * up.bonus;
+            else if (type === 'spd') { upgradeSpdBonus = (up.lv - 1) * up.bonus; for(let i=0; i<3; i++) startCharTimer(i); }
+            else if (type === 'hit') { }
+            else if (type === 'money') upgradeMoneyMult = 1.0 + (up.lv - 1) * up.bonus;
+            uiLogArea.innerText = `アップグレード成功！`;
+            updateUI();
+        }
+    }
+
+    function openMenuWindow(tabName) {
+        document.getElementById('menu-window').style.display = 'block';
+        const contents = document.querySelectorAll('.panel-content');
+        contents.forEach(c => c.classList.remove('active'));
+        document.getElementById(`content-${tabName}`).classList.add('active');
+    }
+
+    // メニューを閉じる
+    function closeMenuWindow() { document.getElementById('menu-window').style.display = 'none'; }
+
+    function rebuildCharListUI() {
+        let container = document.getElementById('char-list-container'); container.innerHTML = "";
+        ownedCharacters.forEach(c => {
+            container.innerHTML += `<div class="list-item">■ <b>${c.name}</b> (所持数:${c.count})<br><span style="color:#666;font-size:10px;">基礎ATK:${c.baseAtk} / 倍率:x${c.atkMult} / 速度:${c.spd}</span></div>`;
+        });
+    }
+
+    function rebuildTreasureUI() {
+        document.getElementById('treasure-effects-display').innerHTML = `・お宝攻撃倍率: +${(treasureEffects.atkBonus*100).toFixed(0)}%<br>・お宝お金倍率: +${(treasureEffects.moneyBonus*100).toFixed(0)}%`;
+        let container = document.getElementById('treasure-list-container'); container.innerHTML = "";
+        for (let id in ownedTreasures) {
+            let t = ownedTreasures[id];
+            container.innerHTML += `<div class="list-item">🏆 <b>${t.name}</b> x${t.count} (${t.desc})</div>`;
+        }
+    }
+
+    function updateUI() {
+        playerHitValue = 10 + (upgrades.hit.lv - 1) * upgrades.hit.bonus + (rbUpgrades.hit.lv * rbUpgrades.hit.bonus);
+
+        uiMoneyDisplay.innerText = `お金: ${money}`;
+        uiStageDisplay.innerText = `ステージ ${stage} (${killsInStage}/5)`;
+        let displayHp = Math.max(0, enemy.hp);
+        uiEnemyHpText.innerText = `HP: ${displayHp} / ${enemy.maxHp}`;
+        uiEnemyHpFill.style.width = `${(displayHp / enemy.maxHp) * 100}%`;
+
+        let reqHit = 10 + (stage - 1) * 15;
+        uiHitReqDisplay.innerText = `このステージの必要命中値: ${reqHit} (あなたの命中: ${playerHitValue})`;
+
+        // 味方キャラのUI表示（images/フォルダから画像を読み込みます）
+        for(let i=0; i<3; i++) {
+            let slot = document.getElementById(`char${i+1}-display`);
+            let char = activeParty[i];
+            if (char) {
+                let finalBaseAtk = char.baseAtk + currentWeapon.attack + (rbUpgrades.atk.lv * rbUpgrades.atk.bonus);
+                let finalMultiplier = char.atkMult * upgradeAtkMult * (1.0 + treasureEffects.atkBonus + (rbUpgrades.mult.lv * rbUpgrades.mult.bonus));
+                let currentDamage = Math.floor(finalBaseAtk * finalMultiplier);
+                slot.className = "char-slot active-char";
+                slot.innerHTML = `
+                    <img src="${char.image}" alt="${char.name}" class="ui-display-img" onerror="this.style.display='none'">
+                    <b>キャラ${i+1}</b><br><span style="color:#1565c0;font-size:9px;">${char.name}</span><br>Dmg: ${currentDamage}
+                `;
+            } else {
+                slot.className = "char-slot"; 
+                slot.innerHTML = `<b>キャラ${i+1}</b><br><span style="color:#999;">(未編成)</span>`;
+            }
+        }
+
+        // 装備武器のUI表示
+        document.getElementById('current-weapon-container').innerHTML = `
+            <img src="${currentWeapon.image}" alt="${currentWeapon.name}" class="weapon-list-img" onerror="this.style.display='none'">
+            <div style="font-size:12px;"><b>現在の武器: ${currentWeapon.name}</b><br><span style="color:#ff9800;font-size:11px;">攻撃力 +${currentWeapon.attack}</span></div>
+        `;
+
+        // 通常ボタンUI更新
+        document.getElementById('btn-atk').innerHTML = `攻撃力<br>Lv.${upgrades.atk.lv}<br>コスト: ${upgrades.atk.cost}`;
+        document.getElementById('btn-atk').disabled = (money < upgrades.atk.cost);
+        document.getElementById('btn-spd').innerHTML = `攻撃速度<br>Lv.${upgrades.spd.lv}<br>コスト: ${upgrades.spd.cost}`;
+        document.getElementById('btn-spd').disabled = (money < upgrades.spd.cost);
+        document.getElementById('btn-hit').innerHTML = `命中<br>数値: ${playerHitValue}<br>コスト: ${upgrades.hit.cost}`;
+        document.getElementById('btn-hit').disabled = (money < upgrades.hit.cost);
+        document.getElementById('btn-money').innerHTML = `お金<br>Lv.${upgrades.money.lv}<br>コスト: ${upgrades.money.cost}`;
+        document.getElementById('btn-money').disabled = (money < upgrades.money.cost);
+
+        // ガチャボタン
+        document.getElementById('gacha-wpn-btn').disabled = (money < costs.weapon);
+        document.getElementById('gacha-chr-btn').disabled = (money < costs.character);
+        document.getElementById('gacha-trs-btn').disabled = (money < costs.treasure);
+
+        let estimatedPoints = Math.max(0, stage - 1);
+        document.getElementById('reborn-info-text').innerHTML = `・所持転生ポイント: <span style="color:#9c27b0;font-size:14px;">${rebornPoints} P</span><br>・現在のステージ進行度: ${stage}<br>・今転生すると貰えるポイント: <b>${estimatedPoints} P</b>`;
+
+        document.getElementById('rb-lbl-atk').innerText = `基礎ATK: +${rbUpgrades.atk.lv * rbUpgrades.atk.bonus} (Lv.${rbUpgrades.atk.lv})`;
+        document.getElementById('rb-btn-atk').disabled = (rebornPoints < 1);
+        document.getElementById('rb-lbl-mult').innerText = `攻撃倍率: +${(rbUpgrades.mult.lv * rbUpgrades.mult.bonus * 100).toFixed(0)}% (Lv.${rbUpgrades.mult.lv})`;
+        document.getElementById('rb-btn-mult').disabled = (rebornPoints < 1);
+        document.getElementById('rb-lbl-spd').innerText = `速度倍率: +${(rbUpgrades.spd.lv * rbUpgrades.spd.bonus * 100).toFixed(0)}% (Lv.${rbUpgrades.spd.lv})`;
+        document.getElementById('rb-btn-spd').disabled = (rebornPoints < 1);
+        document.getElementById('rb-lbl-hit').innerText = `永続命中: +${rbUpgrades.hit.lv * rbUpgrades.hit.bonus} (Lv.${rbUpgrades.hit.lv})`;
+        document.getElementById('rb-btn-hit').disabled = (rebornPoints < 1);
+        document.getElementById('rb-lbl-money').innerText = `お金倍率: +${(rbUpgrades.money.lv * rbUpgrades.money.bonus * 100).toFixed(0)}% (Lv.${rbUpgrades.money.lv})`;
+        document.getElementById('rb-btn-money').disabled = (rebornPoints < 1);
+        document.getElementById('rb-lbl-skip').innerText = `スキップ率: +${(rbUpgrades.skip.lv * rbUpgrades.skip.bonus * 100).toFixed(0)}% (Lv.${rbUpgrades.skip.lv})`;
+        document.getElementById('rb-btn-skip').disabled = (rebornPoints < 1);
+    }
+
+    // 初期化
+    let charTimers = [null, null, null];
+    startCharTimer(0);
+    rebuildCharListUI();
+    updateUI();
+</script>
+</body>
+</html>
