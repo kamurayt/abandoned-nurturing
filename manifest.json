@@ -1,0 +1,25 @@
+{
+  "name": "にゃんこインフレ王国",
+  "short_name": "にゃんこ王国",
+  "description": "にゃんこたちと一緒にインフレバトル！",
+  "start_url": "/abandoned-nurturing/index.html",
+  "scope": "/abandoned-nurturing/",
+  "display": "fullscreen",
+  "orientation": "portrait",
+  "background_color": "#2e7d32",
+  "theme_color": "#2e7d32",
+  "icons": [
+    {
+      "src": "/abandoned-nurturing/images/002.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/abandoned-nurturing/images/002.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}
