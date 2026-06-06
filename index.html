@@ -1,0 +1,1673 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>にゃんこインフレ王国</title>
+
+<!-- PWA -->
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#2e7d32">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="にゃんこ王国">
+<link rel="apple-touch-icon" href="images/002.png">
+<link href="https://fonts.googleapis.com/css2?family=M+PLUS+Rounded+1c:wght@400;700;800;900&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+html,body{width:100%;height:100%;overflow:hidden;font-family:'M PLUS Rounded 1c',sans-serif}
+
+/* ===== 戦場画面（固定） ===== */
+#game-screen{
+  position:fixed;inset:0;
+  background:linear-gradient(180deg,#87ceeb 0%,#b0e0ff 30%,#90c95a 60%,#6aaa2a 75%,#5a9020 100%);
+  overflow:hidden;
+}
+
+/* 雲 */
+.cloud{position:absolute;background:#fff;border-radius:50px;opacity:.85;animation:cloudMove linear infinite}
+.cloud::before,.cloud::after{content:'';position:absolute;background:#fff;border-radius:50%}
+@keyframes cloudMove{0%{transform:translateX(110vw)}100%{transform:translateX(-200px)}}
+
+/* 草地面 */
+#ground{
+  position:absolute;bottom:0;left:0;right:0;height:38%;
+  background:linear-gradient(180deg,#6aaa2a 0%,#5a9020 40%,#4a7a18 100%);
+  border-radius:60% 60% 0 0 / 20px 20px 0 0;
+}
+#ground::before{
+  content:'';position:absolute;top:-8px;left:0;right:0;height:18px;
+  background:repeating-linear-gradient(90deg,#7dc030 0px,#7dc030 12px,#6aaa2a 12px,#6aaa2a 24px);
+  border-radius:50%;opacity:.6;
+}
+
+/* 木 */
+.tree{position:absolute;bottom:34%;pointer-events:none}
+.tree-trunk{width:10px;height:30px;background:#8B5E3C;margin:0 auto;border-radius:3px}
+.tree-top{width:44px;height:44px;background:radial-gradient(circle,#4caf50,#2e7d32);border-radius:50%;margin:0 auto;margin-bottom:-8px;box-shadow:0 4px 0 #1b5e20}
+
+/* ===== 上部HUD ===== */
+#hud-top{
+  position:absolute;top:0;left:0;right:0;
+  padding:6px 8px 4px;
+  background:linear-gradient(180deg,rgba(0,0,0,.45) 0%,transparent 100%);
+  z-index:20;
+}
+#hud-title{
+  font-size:15px;font-weight:900;color:#fff9c4;
+  text-shadow:0 1px 4px rgba(0,0,0,.7),0 0 12px rgba(249,200,37,.5);
+  letter-spacing:.5px;white-space:nowrap;
+}
+.hud-row{display:flex;align-items:center;gap:6px;margin-top:4px}
+.hud-chip{
+  display:flex;align-items:center;gap:3px;
+  background:rgba(0,0,0,.5);border:1px solid rgba(255,255,255,.25);
+  border-radius:20px;padding:3px 8px;font-size:11px;font-weight:800;color:#fff;
+}
+.hud-chip.gold{border-color:rgba(255,200,0,.5)}
+.hud-chip.dia {border-color:rgba(100,180,255,.5)}
+.hud-chip.pt  {border-color:rgba(200,140,255,.5)}
+.hud-gold-val{color:#ffd740}
+.hud-dia-val {color:#82cfff}
+.hud-pt-val  {color:#d49dff}
+.stage-chip{
+  margin-left:auto;background:rgba(0,0,0,.55);border:1.5px solid rgba(255,215,0,.5);
+  border-radius:20px;padding:3px 10px;font-size:12px;font-weight:900;color:#ffe;
+}
+.menu-btn{
+  background:linear-gradient(180deg,#ffe082,#f9a825);color:#4e2600;
+  border:none;border-radius:16px;padding:4px 10px;font-size:11px;font-weight:800;
+  cursor:pointer;font-family:inherit;box-shadow:0 2px 0 rgba(0,0,0,.3);
+}
+
+/* ===== 敵エリア ===== */
+#enemy-area{
+  position:absolute;top:14%;left:50%;transform:translateX(-50%);
+  text-align:center;z-index:15;width:200px;
+}
+#enemy-name-tag{
+  display:inline-block;background:rgba(0,0,0,.65);border:1.5px solid rgba(255,80,80,.6);
+  border-radius:20px;padding:2px 12px;font-size:12px;font-weight:900;color:#fff;
+  margin-bottom:4px;
+}
+#enemy-main-img{
+  width:90px;height:90px;object-fit:contain;image-rendering:pixelated;
+  filter:drop-shadow(0 4px 8px rgba(0,0,0,.4));
+  animation:enemyFloat 2.5s ease-in-out infinite;
+  display:block;margin:0 auto;
+}
+@keyframes enemyFloat{0%,100%{transform:translateY(0)}50%{transform:translateY(-8px)}}
+.enemy-shake{animation:shake .25s ease !important}
+@keyframes shake{0%{transform:translateX(0)}25%{transform:translateX(-6px)}75%{transform:translateX(6px)}100%{transform:translateX(0)}}
+
+/* HPバー（敵の上に表示） */
+#hp-bar-wrap{
+  background:rgba(0,0,0,.5);border-radius:8px;height:10px;
+  border:1px solid rgba(255,100,100,.4);overflow:hidden;margin-top:4px;
+}
+#enemy-hp-bar{height:100%;background:linear-gradient(90deg,#e53935,#ff7043);border-radius:8px;transition:width .12s}
+#enemy-hp-text{font-size:9px;color:rgba(255,255,255,.8);font-weight:700;margin-top:2px}
+
+/* ===== ダメージポップ ===== */
+.dmg-pop{
+  position:absolute;pointer-events:none;
+  font-size:18px;font-weight:900;color:#fff;
+  text-shadow:1px 2px 0 #c62828,0 0 8px rgba(255,100,0,.7);
+  z-index:30;animation:dmgFloat .8s ease-out forwards;
+}
+@keyframes dmgFloat{
+  0%  {opacity:1;transform:translate(-50%,-10px) scale(1.2)}
+  60% {opacity:1;transform:translate(-50%,-40px) scale(1)}
+  100%{opacity:0;transform:translate(-50%,-60px) scale(.8)}
+}
+
+/* ===== キャラエリア（地面上） ===== */
+#cats-area{
+  position:absolute;bottom:30%;left:0;right:0;
+  display:flex;justify-content:center;align-items:flex-end;
+  gap:12px;z-index:16;padding:0 16px;
+}
+.cat-unit{
+  display:flex;flex-direction:column;align-items:center;
+  position:relative;cursor:pointer;
+}
+.cat-unit img{
+  width:60px;height:60px;object-fit:contain;image-rendering:pixelated;
+  filter:drop-shadow(0 3px 6px rgba(0,0,0,.4));
+  transition:transform .08s;
+}
+.cat-unit.attacking img{animation:catAttackAnim .2s ease-out}
+@keyframes catAttackAnim{
+  0%  {transform:translateX(0)}
+  40% {transform:translateX(18px) scaleX(1.1)}
+  100%{transform:translateX(0)}
+}
+.cat-unit.magic-attack img{animation:magicAttackAnim .3s ease-out}
+@keyframes magicAttackAnim{
+  0%  {transform:scale(1)}
+  50% {transform:scale(1.3) rotate(-10deg)}
+  100%{transform:scale(1) rotate(0)}
+}
+.cat-unit.gun-attack img{animation:gunAttackAnim .15s ease-out}
+@keyframes gunAttackAnim{
+  0%  {transform:translateX(0)}
+  30% {transform:translateX(-4px)}
+  100%{transform:translateX(0)}
+}
+.cat-label{
+  font-size:8px;font-weight:800;color:#fff;
+  text-shadow:0 1px 3px rgba(0,0,0,.8);
+  white-space:nowrap;margin-top:2px;
+}
+.cat-weap-label{
+  font-size:7px;color:rgba(255,255,255,.8);
+  text-shadow:0 1px 3px rgba(0,0,0,.9);
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+  max-width:68px;text-align:center;
+  background:rgba(0,0,0,.35);border-radius:4px;padding:1px 4px;margin-top:1px;
+}
+.cat-weap-img-box{
+  width:32px;height:32px;margin-top:3px;
+  background:rgba(0,0,0,.4);border-radius:6px;
+  border:1.5px solid rgba(255,200,50,.6);
+  display:flex;align-items:center;justify-content:center;
+  overflow:hidden;
+}
+.cat-weap-img-box img{
+  width:100%;height:100%;object-fit:contain;image-rendering:pixelated;
+}
+.cat-empty{
+  width:60px;height:60px;border:2px dashed rgba(255,255,255,.3);
+  border-radius:10px;display:flex;align-items:center;justify-content:center;
+  font-size:9px;color:rgba(255,255,255,.5);text-align:center;line-height:1.4;
+}
+
+/* 弾エフェクト */
+.bullet{
+  position:absolute;pointer-events:none;z-index:25;
+  animation:bulletFly .25s ease-out forwards;
+}
+@keyframes bulletFly{
+  0%  {opacity:1;transform:translateX(0) scale(1)}
+  100%{opacity:0;transform:translateX(120px) scale(.5)}
+}
+.magic-orb{
+  position:absolute;pointer-events:none;z-index:25;
+  animation:orbFly .35s ease-out forwards;
+}
+@keyframes orbFly{
+  0%  {opacity:1;transform:translate(0,0) scale(1.2)}
+  100%{opacity:0;transform:translate(80px,-30px) scale(.3)}
+}
+.slash-effect{
+  position:absolute;pointer-events:none;z-index:25;
+  font-size:22px;animation:slashAnim .3s ease-out forwards;
+}
+@keyframes slashAnim{
+  0%  {opacity:1;transform:translate(0,0) rotate(-30deg) scale(1.3)}
+  100%{opacity:0;transform:translate(60px,-20px) rotate(20deg) scale(.5)}
+}
+
+/* ===== 右サイドボタン ===== */
+#side-btns{
+  position:absolute;right:0;top:50%;transform:translateY(-50%);
+  display:flex;flex-direction:column;gap:6px;padding:0 6px;z-index:20;
+}
+.side-btn{
+  width:52px;background:linear-gradient(180deg,#fff9e6,#f9a825);
+  border:2px solid #e65100;border-radius:10px;
+  padding:6px 2px;text-align:center;cursor:pointer;
+  font-size:9px;font-weight:800;color:#4e2600;
+  box-shadow:0 3px 0 rgba(0,0,0,.3);
+  transition:transform .1s;
+}
+.side-btn:active{transform:translateY(2px);box-shadow:0 1px 0 rgba(0,0,0,.3)}
+.side-btn .side-icon{font-size:18px;display:block}
+.side-btn.green{background:linear-gradient(180deg,#c8e6c9,#43a047);border-color:#1b5e20;color:#fff}
+.side-btn.blue {background:linear-gradient(180deg,#bbdefb,#1976d2);border-color:#0d47a1;color:#fff}
+.side-btn.purple{background:linear-gradient(180deg,#e1bee7,#7b1fa2);border-color:#4a148c;color:#fff}
+.side-btn.locked{background:rgba(0,0,0,.3);border-color:rgba(255,255,255,.2);color:rgba(255,255,255,.4);cursor:default}
+
+/* ===== 下部パネル ===== */
+#bottom-panel{
+  position:absolute;bottom:0;left:0;right:0;
+  background:linear-gradient(180deg,rgba(30,60,10,.92) 0%,rgba(20,45,8,1) 100%);
+  border-top:2px solid rgba(120,200,60,.4);
+  padding:6px 8px 8px;z-index:20;
+}
+#upgrade-row{display:flex;gap:5px;margin-bottom:5px}
+.upg-btn{
+  flex:1;background:linear-gradient(180deg,rgba(255,255,255,.12),rgba(255,255,255,.05));
+  border:1.5px solid rgba(255,255,255,.2);border-radius:8px;
+  padding:5px 3px;cursor:pointer;font-family:inherit;
+  color:#fff;font-size:10px;font-weight:700;line-height:1.4;
+  text-align:center;transition:all .12s;
+  box-shadow:0 2px 0 rgba(0,0,0,.4);
+}
+.upg-btn:hover:not(:disabled){background:rgba(255,200,50,.2);border-color:#ffd740;transform:translateY(-1px)}
+.upg-btn:active:not(:disabled){transform:translateY(1px);box-shadow:none}
+.upg-btn:disabled{opacity:.35;cursor:not-allowed}
+.upg-cost{color:#ffd740;font-size:9px;display:block}
+.upg-lv{color:rgba(255,255,255,.5);font-size:8px}
+
+#battle-log{
+  height:36px;overflow-y:auto;font-size:9px;
+  color:rgba(255,255,255,.65);line-height:1.6;
+  border-top:1px solid rgba(255,255,255,.1);padding-top:4px;
+  scrollbar-width:none;
+}
+#battle-log::-webkit-scrollbar{display:none}
+
+/* ===== オーバーレイ（ショップ系） ===== */
+.overlay{
+  display:none;position:fixed;inset:0;
+  background:rgba(0,0,0,.8);backdrop-filter:blur(4px);
+  z-index:200;align-items:flex-start;justify-content:center;
+  padding:10px;overflow-y:auto;
+}
+.overlay.active{display:flex}
+.panel{
+  background:linear-gradient(180deg,#f1f8e9,#e8f5e9);
+  border:2px solid #43a047;border-radius:16px;
+  padding:14px;width:100%;max-width:400px;
+  margin-top:4px;
+  box-shadow:0 8px 32px rgba(0,0,0,.4);
+  animation:slideUp .2s ease;
+}
+@keyframes slideUp{from{transform:translateY(20px);opacity:0}to{transform:translateY(0);opacity:1}}
+.panel-title{
+  font-size:15px;font-weight:900;color:#1b5e20;
+  border-bottom:2px solid #a5d6a7;padding-bottom:8px;margin-bottom:10px;
+}
+.close-btn{
+  width:100%;margin-top:12px;
+  background:linear-gradient(180deg,#ffcdd2,#ef9a9a);
+  border:2px solid #e57373;color:#c62828;
+  border-radius:10px;padding:9px;cursor:pointer;
+  font-family:inherit;font-weight:900;font-size:13px;
+  box-shadow:0 2px 0 rgba(0,0,0,.2);
+}
+
+/* ショップ内共通 */
+.shop-section{margin-bottom:12px}
+.shop-section-title{
+  font-size:11px;font-weight:900;color:#2e7d32;
+  background:#c8e6c9;border-radius:6px;
+  padding:3px 8px;margin-bottom:6px;display:inline-block;
+}
+.btn-grid-3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:5px;margin-bottom:6px}
+.btn-grid-2{display:grid;grid-template-columns:1fr 1fr;gap:5px}
+.shop-btn{
+  background:#fff;border:2px solid #a5d6a7;border-radius:10px;
+  padding:8px 5px;cursor:pointer;font-family:inherit;
+  color:#1b5e20;font-size:10px;font-weight:700;line-height:1.5;
+  text-align:center;box-shadow:0 2px 0 rgba(0,0,0,.1);
+  transition:all .12s;
+}
+.shop-btn:hover:not(:disabled){background:#f1f8e9;border-color:#43a047;transform:translateY(-1px)}
+.shop-btn:active:not(:disabled){transform:translateY(1px);box-shadow:none}
+.shop-btn:disabled{opacity:.4;cursor:not-allowed}
+.shop-btn.yellow{border-color:#ffd740;background:linear-gradient(180deg,#fffde7,#fff9c4)}
+.shop-btn.blue  {border-color:#90caf9;background:linear-gradient(180deg,#e3f2fd,#bbdefb)}
+.shop-btn.purple{border-color:#ce93d8;background:linear-gradient(180deg,#f3e5f5,#e1bee7)}
+.shop-btn .btn-cost{color:#e65100;font-size:9px;font-weight:800;display:block}
+.shop-btn .btn-lv  {color:#888;font-size:8px}
+.shop-btn .btn-eff {color:#2e7d32;font-size:8px;display:block}
+.gacha-result{
+  text-align:center;font-size:12px;font-weight:900;
+  color:#e65100;min-height:18px;margin:4px 0;
+  text-shadow:0 1px 0 rgba(255,255,255,.8);
+}
+.treasure-list{
+  background:#fff;border:1.5px solid #ffe082;border-radius:8px;
+  padding:6px 8px;font-size:10px;color:#4e342e;
+  max-height:60px;overflow-y:auto;line-height:1.7;margin-bottom:6px;
+}
+
+/* ヘルプセクション */
+.help-section{margin-bottom:14px;border:1.5px solid #c8e6c9;border-radius:10px;overflow:hidden}
+.help-title{background:linear-gradient(135deg,#43a047,#2e7d32);color:#fff;font-size:12px;font-weight:900;padding:6px 10px}
+.help-body{padding:8px 10px;font-size:10px;color:#333;line-height:1.8}
+.help-table{margin:6px 0;border:1px solid #e0e0e0;border-radius:6px;overflow:hidden}
+.help-row{display:flex;gap:4px;padding:4px 8px;font-size:10px;border-bottom:1px solid #f0f0f0}
+.help-row:last-child{border-bottom:none}
+.help-row.header{background:#f1f8e9;font-weight:800;color:#2e7d32}
+.help-row span{flex:1}
+
+/* ガチャ回数ボタン */
+.gacha-times-btn{
+  flex:1;background:#fff;border:2px solid #a5d6a7;border-radius:8px;
+  padding:6px 4px;cursor:pointer;font-family:inherit;
+  color:#2e7d32;font-size:11px;font-weight:800;
+  transition:all .12s;box-shadow:0 2px 0 rgba(0,0,0,.1);
+}
+.gacha-times-btn.active{
+  background:linear-gradient(180deg,#c8e6c9,#43a047);
+  color:#fff;border-color:#2e7d32;
+  box-shadow:0 2px 0 rgba(0,0,0,.2);
+}
+.gacha-times-btn:hover:not(.active){background:#f1f8e9}
+
+/* タブボタン */
+.tab-btn{
+  background:#fff;border:2px solid #a5d6a7;border-radius:10px;
+  padding:6px 4px;cursor:pointer;font-family:inherit;
+  color:#2e7d32;font-size:10px;font-weight:800;line-height:1.5;
+  text-align:center;transition:all .12s;
+}
+.tab-btn.active{background:linear-gradient(180deg,#c8e6c9,#43a047);color:#fff;border-color:#2e7d32;}
+.tab-btn:hover:not(.active){background:#f1f8e9;}
+
+/* キャラ詳細ポップアップ */
+#cat-popup{
+  display:none;position:fixed;inset:0;
+  background:rgba(0,0,0,.7);z-index:300;
+  align-items:center;justify-content:center;padding:16px;
+}
+#cat-popup.active{display:flex}
+#cat-popup .panel{max-width:320px;background:#fff}
+#cat-popup .panel-title{color:#1b5e20}
+
+/* レアリティカラー */
+.r1{color:#9e9e9e}.r2{color:#00897b}.r3{color:#1976d2}.r4{color:#7b1fa2}.r5{color:#f57f17}
+
+/* 広告バフ表示 */
+#ad-indicator{
+  display:inline-block;
+  background:rgba(0,0,0,.45);border:1px solid rgba(100,200,100,.3);
+  border-radius:10px;padding:2px 8px;font-size:9px;color:rgba(255,255,255,.7);
+  font-weight:700;
+}
+#ad-indicator.active{border-color:rgba(100,255,100,.7);color:#b9f6ca}
+</style>
+</head>
+<body>
+
+<!-- ===== 戦場画面 ===== -->
+<div id="game-screen">
+  <!-- 雲 -->
+  <div class="cloud" style="width:80px;height:22px;top:8%;animation-duration:28s;animation-delay:-5s"><div style="position:absolute;width:40px;height:34px;border-radius:50%;background:#fff;top:-18px;left:12px"></div><div style="position:absolute;width:28px;height:28px;border-radius:50%;background:#fff;top:-14px;left:36px"></div></div>
+  <div class="cloud" style="width:60px;height:18px;top:14%;animation-duration:22s;animation-delay:-14s"><div style="position:absolute;width:32px;height:28px;border-radius:50%;background:#fff;top:-15px;left:8px"></div></div>
+  <div class="cloud" style="width:100px;height:26px;top:6%;animation-duration:35s;animation-delay:-20s"><div style="position:absolute;width:50px;height:40px;border-radius:50%;background:#fff;top:-22px;left:15px"></div><div style="position:absolute;width:36px;height:32px;border-radius:50%;background:#fff;top:-18px;left:50px"></div></div>
+
+  <!-- 木 -->
+  <div class="tree" style="left:5%"><div class="tree-top"></div><div class="tree-trunk"></div></div>
+  <div class="tree" style="left:16%;bottom:36%"><div class="tree-top" style="width:34px;height:34px"></div><div class="tree-trunk" style="height:22px"></div></div>
+  <div class="tree" style="right:8%"><div class="tree-top"></div><div class="tree-trunk"></div></div>
+  <div class="tree" style="right:20%;bottom:36%"><div class="tree-top" style="width:38px;height:38px"></div><div class="tree-trunk" style="height:26px"></div></div>
+
+  <!-- 地面 -->
+  <div id="ground"></div>
+
+  <!-- 上部HUD -->
+  <div id="hud-top">
+    <div style="display:flex;align-items:center;gap:6px">
+      <div id="hud-title">🐱 にゃんこインフレ王国</div>
+      <button class="menu-btn" style="margin-left:auto" onclick="openMenu()">📋 メニュー</button>
+    </div>
+    <div class="hud-row">
+      <div class="hud-chip gold">💰<span class="hud-gold-val" id="res-gold">0</span></div>
+      <div class="hud-chip dia">💎<span class="hud-dia-val" id="res-diamond">0</span></div>
+      <div class="hud-chip pt">🌀<span class="hud-pt-val" id="res-prestige">0</span></div>
+      <div class="stage-chip" id="stage-display">ステージ1 (0/5)</div>
+    </div>
+    <div id="ad-indicator" style="margin-top:3px">📺 広告バフ：<span id="ad-buff-text">OFF</span></div>
+  </div>
+
+  <!-- 敵エリア -->
+  <div id="enemy-area">
+    <div id="enemy-name-tag">【スライム】</div>
+    <img id="enemy-main-img" src="images/001.png" alt="敵">
+    <div id="hp-bar-wrap"><div id="enemy-hp-bar" style="width:100%"></div></div>
+    <div id="enemy-hp-text">HP: 10/10</div>
+    <div style="display:flex;align-items:center;justify-content:center;gap:8px;margin-top:4px">
+      <div id="stage-timer" style="font-size:11px;font-weight:800;color:rgba(255,255,255,.8)">⏱ 15秒</div>
+      <button id="mode-btn" onclick="exitFarmingMode()" style="display:none;background:linear-gradient(180deg,#ffe082,#f9a825);border:none;border-radius:12px;padding:3px 10px;font-size:10px;font-weight:900;color:#4e2600;cursor:pointer;font-family:inherit">▶ 進行モードへ</button>
+    </div>
+  </div>
+
+  <!-- キャラエリア -->
+  <div id="cats-area">
+    <div class="cat-unit" id="cat-unit-0" onclick="clickSlot(0)">
+      <img src="images/002.png" id="cat-img-0" alt="キャラ">
+      <div class="cat-weap-img-box" id="cat-weap-box-0" style="display:none"><img id="cat-weap-img-0" src="" alt="武器"></div>
+      <div class="cat-label" id="cat-label-0">茶ネコ</div>
+      <div class="cat-weap-label" id="cat-weap-0">素手</div>
+    </div>
+    <div class="cat-unit" id="cat-unit-1" onclick="clickSlot(1)">
+      <img src="" id="cat-img-1" alt="キャラ" style="display:none">
+      <div class="cat-empty" id="cat-empty-1">🔒<br>銃ネコ</div>
+      <div class="cat-weap-img-box" id="cat-weap-box-1" style="display:none"><img id="cat-weap-img-1" src="" alt="武器"></div>
+      <div class="cat-label" id="cat-label-1" style="display:none"></div>
+      <div class="cat-weap-label" id="cat-weap-1" style="display:none">素手</div>
+    </div>
+    <div class="cat-unit" id="cat-unit-2" onclick="clickSlot(2)">
+      <img src="" id="cat-img-2" alt="キャラ" style="display:none">
+      <div class="cat-empty" id="cat-empty-2">🔒<br>魔法</div>
+      <div class="cat-weap-img-box" id="cat-weap-box-2" style="display:none"><img id="cat-weap-img-2" src="" alt="武器"></div>
+      <div class="cat-label" id="cat-label-2" style="display:none"></div>
+      <div class="cat-weap-label" id="cat-weap-2" style="display:none">素手</div>
+    </div>
+  </div>
+
+  <!-- 右サイドボタン -->
+  <div id="side-btns">
+    <div class="side-btn green"  onclick="openSidePanel('prestige')"><span class="side-icon">🌀</span>転生</div>
+    <div class="side-btn purple" onclick="openSidePanel('gacha')"><span class="side-icon">🎰</span>ガチャ</div>
+    <div class="side-btn blue"   onclick="openSidePanel('treasure')"><span class="side-icon">🎁</span>お宝</div>
+    <div class="side-btn" style="background:linear-gradient(180deg,#fff9c4,#f9a825);border-color:#e65100;color:#4e2600" onclick="openRankingPanel()"><span class="side-icon">🏆</span>順位</div>
+    <div class="side-btn"        onclick="openSidePanel('ad')"><span class="side-icon">📺</span>広告</div>
+  </div>
+
+  <!-- 下部強化パネル -->
+  <div id="bottom-panel">
+    <div id="upgrade-row">
+      <button class="upg-btn" id="btn-up-atk" onclick="buyUpgrade('atk')">
+        ⚔️攻撃+10%<span class="upg-cost"><span id="cost-up-atk">10</span>G</span><span class="upg-lv">Lv<span id="lv-up-atk">0</span></span>
+      </button>
+      <button class="upg-btn" id="btn-up-spd" onclick="buyUpgrade('spd')">
+        ⚡速度+2%<span class="upg-cost"><span id="cost-up-spd">50</span>G</span><span class="upg-lv">Lv<span id="lv-up-spd">0</span></span>
+      </button>
+      <button class="upg-btn" id="btn-up-gold" onclick="buyUpgrade('gold')">
+        💰G+10%<span class="upg-cost"><span id="cost-up-gold">25</span>G</span><span class="upg-lv">Lv<span id="lv-up-gold">0</span></span>
+      </button>
+      <button class="upg-btn" id="btn-up-hit" onclick="buyUpgrade('hit')">
+        🎯命中+3<span class="upg-cost"><span id="cost-up-hit">15</span>G</span><span class="upg-lv">Lv<span id="lv-up-hit">0</span></span>
+      </button>
+    </div>
+    <div id="battle-log"></div>
+  </div>
+</div>
+
+<!-- ===== メニューオーバーレイ（ステータス・引き継ぎ・ヘルプ） ===== -->
+<div class="overlay" id="menu-overlay" onclick="closeMenu()">
+<div class="panel" onclick="event.stopPropagation()">
+  <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:4px;margin-bottom:12px">
+    <button class="tab-btn active" id="tab-btn-status"   onclick="switchMenuTab('status')">📊 ステータス</button>
+    <button class="tab-btn"        id="tab-btn-transfer" onclick="switchMenuTab('transfer')">🔑 引き継ぎ</button>
+    <button class="tab-btn"        id="tab-btn-help"     onclick="switchMenuTab('help')">❓ ヘルプ</button>
+  </div>
+
+  <!-- ステータス -->
+  <div id="tab-status">
+    <div class="panel-title">📊 ステータス</div>
+    <div id="status-body" style="font-size:11px;line-height:2;color:#333"></div>
+  </div>
+
+  <!-- 引き継ぎ -->
+  <div id="tab-transfer" style="display:none">
+    <div class="panel-title">🔑 データ引き継ぎ</div>
+    <div style="margin-bottom:12px">
+      <div style="font-size:11px;color:#555;margin-bottom:6px">① 引き継ぎコードを発行してコピー</div>
+      <button class="shop-btn" style="width:100%;background:linear-gradient(180deg,#fff9c4,#f9a825);border-color:#f57f17;font-weight:900;font-size:12px" onclick="generateCode()">🔑 引き継ぎコードを発行</button>
+      <div id="transfer-code-box" style="display:none;margin-top:8px">
+        <div style="font-size:9px;color:#555;margin-bottom:4px">↓ 長押しでコピー</div>
+        <div id="transfer-code-text" style="background:#f5f5f5;border:2px solid #43a047;border-radius:8px;padding:8px;font-size:10px;word-break:break-all;font-family:monospace;color:#1b5e20;line-height:1.5;user-select:all;-webkit-user-select:all"></div>
+        <button class="shop-btn" style="width:100%;margin-top:6px;background:linear-gradient(180deg,#bbdefb,#1976d2);color:#fff;border-color:#0d47a1" onclick="copyCode()">📋 コピーする</button>
+        <div id="copy-msg" style="text-align:center;font-size:10px;color:#2e7d32;font-weight:800;min-height:16px;margin-top:4px"></div>
+      </div>
+    </div>
+    <div style="border-top:1px solid #c8e6c9;padding-top:12px">
+      <div style="font-size:11px;color:#555;margin-bottom:6px">② 別端末のコードを入力して引き継ぎ</div>
+      <textarea id="transfer-input" style="width:100%;height:70px;border:2px solid #a5d6a7;border-radius:8px;padding:6px;font-size:10px;font-family:monospace;resize:none;color:#333" placeholder="引き継ぎコードをここに貼り付け…"></textarea>
+      <button class="shop-btn" style="width:100%;margin-top:6px;background:linear-gradient(180deg,#ffcdd2,#e53935);color:#fff;border-color:#c62828;font-weight:900" onclick="applyCode()">⚠️ このコードで引き継ぐ（現データ上書き）</button>
+      <div id="transfer-msg" style="text-align:center;font-size:10px;min-height:16px;margin-top:4px;font-weight:800"></div>
+    </div>
+  </div>
+
+  <!-- ヘルプ -->
+  <div id="tab-help" style="display:none">
+    <div class="panel-title">❓ ヘルプ</div>
+    <div style="font-size:11px;color:#333;line-height:1.7;overflow-y:auto;max-height:65vh">
+
+      <!-- 命中 -->
+      <div class="help-section">
+        <div class="help-title">🎯 命中システム</div>
+        <div class="help-body">
+          各ステージには<b>必要命中値</b>が設定されています。<br>
+          自分の命中が必要値を<b>下回ると攻撃がミスする</b>確率が上がります。<br>
+          命中は以下の方法で上げられます：<br>
+          　・ゴールド強化「命中+3」<br>
+          　・転生ショップ「命中強化」（+5/Lv・永続）<br>
+          　・お宝「古びた虫眼鏡」
+          <div class="help-table">
+            <div class="help-row"><span>ステージ1〜10</span><span>必要命中: 0</span></div>
+            <div class="help-row"><span>ステージ11〜20</span><span>必要命中: 2</span></div>
+            <div class="help-row"><span>ステージ21〜30</span><span>必要命中: 5</span></div>
+            <div class="help-row"><span>ステージ31〜40</span><span>必要命中: 10</span></div>
+            <div class="help-row"><span>ステージ41〜50</span><span>必要命中: 18</span></div>
+            <div class="help-row"><span>ステージ51〜60</span><span>必要命中: 30</span></div>
+            <div class="help-row"><span>ステージ61〜70</span><span>必要命中: 50</span></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- キャラタイプ -->
+      <div class="help-section">
+        <div class="help-title">⚔️ キャラタイプ</div>
+        <div class="help-body">
+          キャラには3種類のタイプがあり、得意分野が異なります。
+          <div class="help-table">
+            <div class="help-row header"><span>タイプ</span><span>攻撃力</span><span>攻撃速度</span></div>
+            <div class="help-row"><span>⚔️ 剣</span><span>★★☆</span><span>★★☆</span></div>
+            <div class="help-row"><span>🔫 銃</span><span>★☆☆</span><span>★★★</span></div>
+            <div class="help-row"><span>✨ 魔法</span><span>★★★</span><span>★☆☆</span></div>
+          </div>
+          武器もタイプが一致するキャラに自動装備されます。<br>
+          同じキャラが重複すると<b>ATK+5%</b>のボーナスがかかります。
+        </div>
+      </div>
+
+      <!-- ガチャ -->
+      <div class="help-section">
+        <div class="help-title">🎰 ガチャ確率</div>
+        <div class="help-body">
+          武器・キャラ・お宝で共通の排出率です。
+          <div class="help-table">
+            <div class="help-row header"><span>レアリティ</span><span>確率</span></div>
+            <div class="help-row"><span>⭐ ★1</span><span>65.0%</span></div>
+            <div class="help-row"><span>⭐⭐ ★2</span><span>19.0%</span></div>
+            <div class="help-row"><span>⭐⭐⭐ ★3</span><span>12.5%</span></div>
+            <div class="help-row"><span>⭐⭐⭐⭐ ★4</span><span>4.3%</span></div>
+            <div class="help-row"><span>⭐⭐⭐⭐⭐ ★5</span><span>1.2%</span></div>
+          </div>
+          重複した場合：武器は<b>ATK+0.5%/凸</b>、キャラは<b>ATK+5%/体</b>のボーナス。
+        </div>
+      </div>
+
+      <!-- 転生 -->
+      <div class="help-section">
+        <div class="help-title">🌀 転生システム</div>
+        <div class="help-body">
+          <b>ステージ5クリア後</b>から転生が可能になります。<br><br>
+          <b>リセットされるもの：</b><br>
+          　・ゴールド<br>
+          　・ゴールド強化（攻撃・速度・Gold・命中）<br><br>
+          <b>引き継がれるもの：</b><br>
+          　・キャラ・武器・お宝<br>
+          　・ダイヤ・転生Pt<br>
+          　・転生ショップの強化（永続）<br><br>
+          高いステージで転生するほど<b>獲得Ptが多く</b>なります。<br>
+          転生Ptは転生ショップで<b>永続強化</b>に使えます（上限なし）。
+        </div>
+      </div>
+
+      <!-- お宝 -->
+      <div class="help-section">
+        <div class="help-title">🎁 お宝</div>
+        <div class="help-body">
+          ガチャで入手できる特殊アイテムです。
+          <div class="help-table">
+            <div class="help-row header"><span>お宝名</span><span>効果</span></div>
+            <div class="help-row"><span>錆びた手鏡</span><span>ATK+5%/Lv</span></div>
+            <div class="help-row"><span>旅人の財布</span><span>Gold+5%/Lv</span></div>
+            <div class="help-row"><span>古びた虫眼鏡</span><span>命中+2/Lv</span></div>
+            <div class="help-row"><span>魔力の結晶</span><span>ダイヤ+5%/Lv</span></div>
+            <div class="help-row"><span>転生の証</span><span>転生Pt+10%/Lv</span></div>
+            <div class="help-row"><span>疾風の羽根</span><span>速度-3%/Lv</span></div>
+            <div class="help-row"><span>インフレの刻印</span><span>ATK+20%/Lv</span></div>
+          </div>
+          重複するとLvが上がり効果が強化されます。上限はありません。
+        </div>
+      </div>
+
+      <!-- 強化 -->
+      <div class="help-section">
+        <div class="help-title">💪 強化システム</div>
+        <div class="help-body">
+          <b>ゴールド強化</b>（転生でリセット）<br>
+          　⚔️ 攻撃：フラットATK+5/Lv<br>
+          　⚡ 速度：攻撃間隔-2%/Lv<br>
+          　💰 Gold：獲得金額+10%/Lv<br>
+          　🎯 命中：命中+3/Lv<br><br>
+          <b>転生ショップ強化</b>（永続・上限なし）<br>
+          　⚔️ 攻撃力%+：ATK+5%/Lv<br>
+          　⚡ 速度%+：攻撃間隔-3%/Lv<br>
+          　💰 Gold%+：獲得金額+10%/Lv<br>
+          　🎯 命中+：命中+5/Lv<br>
+          　💎 ダイヤ%+：ダイヤ+10%/Lv<br>
+          　🌀 転生Pt%+：転生Pt+10%/Lv<br>
+          　⏭️ スキップ%+：100%で1ステージスキップ<br><br>
+          攻撃速度の上限は<b>最速0.1秒/回</b>です。
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <button class="close-btn" onclick="closeMenu()">✕ 閉じる</button>
+</div>
+</div>
+
+<!-- ===== ガチャパネル ===== -->
+<div class="overlay" id="gacha-overlay" onclick="closeSidePanel('gacha')">
+<div class="panel" onclick="event.stopPropagation()">
+  <div class="panel-title">🎰 ガチャ</div>
+
+  <!-- 回数選択 -->
+  <div style="display:flex;gap:5px;margin-bottom:10px">
+    <button class="gacha-times-btn active" id="gtimes-1"   onclick="setGachaTimes(1)">1回</button>
+    <button class="gacha-times-btn"        id="gtimes-10"  onclick="setGachaTimes(10)">10回</button>
+    <button class="gacha-times-btn"        id="gtimes-100" onclick="setGachaTimes(100)">100回</button>
+    <button class="gacha-times-btn"        id="gtimes-max" onclick="setGachaTimes('max')">MAX</button>
+  </div>
+
+  <!-- コスト表示 -->
+  <div style="font-size:10px;color:#555;text-align:center;margin-bottom:8px">
+    必要💎: <span id="gacha-cost-weapon" style="color:#e65100;font-weight:800">100</span>(武器)　
+    <span id="gacha-cost-cat" style="color:#1565c0;font-weight:800">150</span>(キャラ)　
+    <span id="gacha-cost-treasure" style="color:#6a1b9a;font-weight:800">80</span>(お宝)
+  </div>
+
+  <div class="btn-grid-3">
+    <button class="shop-btn yellow" onclick="rollGacha('weapon')">⚔️ 武器</button>
+    <button class="shop-btn blue"   onclick="rollGacha('cat')">🐱 キャラ</button>
+    <button class="shop-btn purple" onclick="rollGacha('treasure')">🎁 お宝</button>
+  </div>
+  <div class="gacha-result" id="gacha-result">ガチャで仲間を増やそう！</div>
+  <button class="close-btn" onclick="closeSidePanel('gacha')">✕ 閉じる</button>
+</div>
+</div>
+
+<!-- ===== お宝パネル ===== -->
+<div class="overlay" id="treasure-overlay" onclick="closeSidePanel('treasure')">
+<div class="panel" onclick="event.stopPropagation()">
+  <div class="panel-title">🎁 お宝一覧</div>
+  <div style="font-size:10px;color:#555;margin-bottom:8px">重複するとLvが上がり効果が強化されます（上限なし）</div>
+  <div id="treasure-all-list">
+    <!-- JSで描画 -->
+  </div>
+  <button class="close-btn" onclick="closeSidePanel('treasure')">✕ 閉じる</button>
+</div>
+</div>
+
+<!-- ===== 転生パネル ===== -->
+<div class="overlay" id="prestige-overlay" onclick="closeSidePanel('prestige')">
+<div class="panel" onclick="event.stopPropagation()">
+  <div class="panel-title">🌀 転生ショップ <span style="font-size:10px;color:#7b1fa2">※永続強化</span></div>
+  <div style="font-size:11px;color:#555;margin-bottom:8px">転生Pt: <strong id="prestige-pt-display2" style="color:#7b1fa2">0</strong></div>
+  <div class="btn-grid-2">
+    <button class="shop-btn" id="pt-btn-atk"    onclick="buyPrestige('atk')">⚔️ 攻撃力%+<span class="btn-cost"><span id="pt-cost-atk">5</span>Pt</span><span class="btn-lv">Lv<span id="pt-lv-atk">0</span></span><span class="btn-eff" id="pt-eff-atk">効果なし</span></button>
+    <button class="shop-btn" id="pt-btn-spd"    onclick="buyPrestige('spd')">⚡ 速度%+<span class="btn-cost"><span id="pt-cost-spd">8</span>Pt</span><span class="btn-lv">Lv<span id="pt-lv-spd">0</span></span><span class="btn-eff" id="pt-eff-spd">効果なし</span></button>
+    <button class="shop-btn" id="pt-btn-gold"   onclick="buyPrestige('gold')">💰 Gold%+<span class="btn-cost"><span id="pt-cost-gold">5</span>Pt</span><span class="btn-lv">Lv<span id="pt-lv-gold">0</span></span><span class="btn-eff" id="pt-eff-gold">効果なし</span></button>
+    <button class="shop-btn" id="pt-btn-hit"    onclick="buyPrestige('hit')">🎯 命中+<span class="btn-cost"><span id="pt-cost-hit">6</span>Pt</span><span class="btn-lv">Lv<span id="pt-lv-hit">0</span></span><span class="btn-eff" id="pt-eff-hit">効果なし</span></button>
+    <button class="shop-btn" id="pt-btn-dia"    onclick="buyPrestige('dia')">💎 ダイヤ%+<span class="btn-cost"><span id="pt-cost-dia">10</span>Pt</span><span class="btn-lv">Lv<span id="pt-lv-dia">0</span></span><span class="btn-eff" id="pt-eff-dia">効果なし</span></button>
+    <button class="shop-btn" id="pt-btn-ptgain" onclick="buyPrestige('ptgain')">🌀 転生Pt%+<span class="btn-cost"><span id="pt-cost-ptgain">15</span>Pt</span><span class="btn-lv">Lv<span id="pt-lv-ptgain">0</span></span><span class="btn-eff" id="pt-eff-ptgain">効果なし</span></button>
+    <button class="shop-btn" id="pt-btn-skip" style="grid-column:span 2" onclick="buyPrestige('skip')">⏭️ スキップ%+<span class="btn-cost"><span id="pt-cost-skip">20</span>Pt</span><span class="btn-lv">Lv<span id="pt-lv-skip">0</span></span><span class="btn-eff" id="pt-eff-skip">効果なし</span></button>
+  </div>
+  <div style="margin-top:10px;border-top:1px solid #c8e6c9;padding-top:8px">
+    <div style="font-size:10px;color:#555;margin-bottom:6px">🔄 時空転生（ゴールド・基礎強化リセット）</div>
+    <button class="shop-btn" style="width:100%;background:linear-gradient(180deg,#c8e6c9,#43a047);color:#fff;border-color:#2e7d32;font-size:12px" id="btn-do-prestige" onclick="doPrestige()">
+      🌀 転生する！ <span id="gain-prestige-pt" style="font-size:10px">Ste5クリアで解放</span>
+    </button>
+  </div>
+  <button class="close-btn" onclick="closeSidePanel('prestige')">✕ 閉じる</button>
+</div>
+</div>
+
+<!-- ===== 広告パネル ===== -->
+<div class="overlay" id="ad-overlay" onclick="closeSidePanel('ad')">
+<div class="panel" onclick="event.stopPropagation()">
+  <div class="panel-title">📺 広告バフ</div>
+  <div style="font-size:11px;color:#555;margin-bottom:8px"><span id="ad-timer-text">動画視聴で3分間【全効果3倍】</span></div>
+  <div style="display:flex;gap:6px;align-items:center;margin-bottom:8px">
+    <button class="shop-btn" style="flex:1;background:linear-gradient(180deg,#c8e6c9,#43a047);color:#fff;border-color:#2e7d32" onclick="watchAd()">▶ 動画でバフON</button>
+    <label style="font-size:10px;color:#555"><input type="checkbox" id="no-ads-cheat" onchange="toggleNoAds()"> 👑広告なし</label>
+  </div>
+  <button class="close-btn" onclick="closeSidePanel('ad')">✕ 閉じる</button>
+</div>
+</div>
+
+<!-- ===== ランキングパネル ===== -->
+<div class="overlay" id="ranking-overlay" onclick="closeSidePanel('ranking')">
+<div class="panel" onclick="event.stopPropagation()">
+  <div class="panel-title">🏆 最高到達ステージ ランキング</div>
+  <div style="font-size:10px;color:#555;margin-bottom:8px">
+    あなた：<span id="my-rank-text" style="color:#e65100;font-weight:800">－</span>位　
+    最高ステージ：<span id="my-best-stage" style="color:#2e7d32;font-weight:800">－</span>
+  </div>
+  <div id="ranking-list" style="font-size:11px;color:#333;min-height:80px;max-height:55vh;overflow-y:auto">
+    <div style="text-align:center;color:#888;padding:20px">読み込み中...</div>
+  </div>
+  <button class="shop-btn" style="width:100%;margin-top:8px;background:linear-gradient(180deg,#fff9c4,#f9a825);border-color:#f57f17;font-weight:800" onclick="loadRanking()">🔄 更新</button>
+  <button class="close-btn" onclick="closeSidePanel('ranking')">✕ 閉じる</button>
+</div>
+</div>
+
+<!-- ===== ニックネーム登録ダイアログ ===== -->
+<div class="overlay" id="nickname-overlay">
+<div class="panel" onclick="event.stopPropagation()" style="max-width:320px">
+  <div class="panel-title">🐱 ニックネーム登録</div>
+  <div style="font-size:11px;color:#555;margin-bottom:12px;line-height:1.7">
+    ランキングに表示される名前を入力してください。<br>
+    <span style="color:#e53935;font-size:10px">※後から変更できません</span>
+  </div>
+  <input id="nickname-input" type="text" maxlength="12" placeholder="ニックネーム（最大12文字）"
+    style="width:100%;border:2px solid #a5d6a7;border-radius:8px;padding:8px 10px;font-size:14px;font-family:inherit;color:#333;margin-bottom:8px">
+  <div id="nickname-error" style="color:#e53935;font-size:10px;min-height:16px;margin-bottom:6px"></div>
+  <button class="shop-btn" style="width:100%;background:linear-gradient(180deg,#c8e6c9,#43a047);color:#fff;border-color:#2e7d32;font-size:13px;font-weight:900" onclick="registerNickname()">
+    ✅ 登録してランキングに参加
+  </button>
+</div>
+</div>
+<div id="cat-popup" onclick="closeCatPopup()">
+<div class="panel" onclick="event.stopPropagation()" style="max-width:300px;background:#fff;margin-top:60px">
+  <div class="panel-title" id="pop-title">キャラ詳細</div>
+  <div id="pop-body" style="font-size:12px;line-height:1.8;color:#333"></div>
+  <button class="close-btn" onclick="closeCatPopup()">✕ 閉じる</button>
+</div>
+</div>
+
+<script>
+// ===== DB =====
+const ENEMIES_DB = {
+    '001': { name: 'スライム',     img: 'images/001.png' },
+    '017': { name: 'おばけ',       img: 'images/017.png' },
+    '018': { name: 'コウモリ',     img: 'images/018.png' },
+    '019': { name: 'ゴブリン',     img: 'images/019.png' },
+    '020': { name: 'ミニドラゴン', img: 'images/020.png' }
+};
+const CATS_DB = {
+    '002': { name: '茶ネコ',       type: '剣',   baseAtk: 10,     baseInterval: 1000, atkWeight: 1.4, img: 'images/002.png', rare: 1 },
+    '003': { name: '白ネコ',       type: '銃',   baseAtk: 8,      baseInterval: 600,  atkWeight: 1.0, img: 'images/003.png', rare: 1 },
+    '004': { name: 'こげネコ',     type: '魔法', baseAtk: 15,     baseInterval: 1500, atkWeight: 1.8, img: 'images/004.png', rare: 1 },
+    '005': { name: '騎士ネコ',     type: '剣',   baseAtk: 80,     baseInterval: 1000, atkWeight: 1.4, img: 'images/005.png', rare: 2 },
+    '006': { name: '銃ネコ',       type: '銃',   baseAtk: 65,     baseInterval: 600,  atkWeight: 1.0, img: 'images/006.png', rare: 2 },
+    '007': { name: '魔法ネコ',     type: '魔法', baseAtk: 120,    baseInterval: 1500, atkWeight: 1.8, img: 'images/007.png', rare: 2 },
+    '008': { name: '王国騎士ネコ', type: '剣',   baseAtk: 750,    baseInterval: 1000, atkWeight: 1.4, img: 'images/008.png', rare: 3 },
+    '009': { name: '王国銃ネコ',   type: '銃',   baseAtk: 600,    baseInterval: 600,  atkWeight: 1.0, img: 'images/009.png', rare: 3 },
+    '010': { name: '王国魔法ネコ', type: '魔法', baseAtk: 1100,   baseInterval: 1500, atkWeight: 1.8, img: 'images/010.png', rare: 3 },
+    '011': { name: '国王騎士ネコ', type: '剣',   baseAtk: 7000,   baseInterval: 1000, atkWeight: 1.4, img: 'images/011.png', rare: 4 },
+    '012': { name: '国王銃ネコ',   type: '銃',   baseAtk: 5500,   baseInterval: 600,  atkWeight: 1.0, img: 'images/012.png', rare: 4 },
+    '013': { name: '国王魔法ネコ', type: '魔法', baseAtk: 9500,   baseInterval: 1500, atkWeight: 1.8, img: 'images/013.png', rare: 4 },
+    '014': { name: '覇王騎士ネコ', type: '剣',   baseAtk: 65000,  baseInterval: 1000, atkWeight: 1.4, img: 'images/014.png', rare: 5 },
+    '015': { name: '覇王銃ネコ',   type: '銃',   baseAtk: 50000,  baseInterval: 600,  atkWeight: 1.0, img: 'images/015.png', rare: 5 },
+    '016': { name: '覇王魔法ネコ', type: '魔法', baseAtk: 100000, baseInterval: 1500, atkWeight: 1.8, img: 'images/016.png', rare: 5 }
+};
+const WEAPONS_DB = {
+    '021': { name: '木の剣',         type: '剣',   baseAtk: 5,      img: 'images/021.png', rare: 1 },
+    '022': { name: '木のパチンコ',   type: '銃',   baseAtk: 4,      img: 'images/022.png', rare: 1 },
+    '023': { name: '木の杖',         type: '魔法', baseAtk: 8,      img: 'images/023.png', rare: 1 },
+    '024': { name: '銅の剣',         type: '剣',   baseAtk: 60,     img: 'images/024.png', rare: 2 },
+    '025': { name: '銅の銃',         type: '銃',   baseAtk: 45,     img: 'images/025.png', rare: 2 },
+    '026': { name: '銅の杖',         type: '魔法', baseAtk: 90,     img: 'images/026.png', rare: 2 },
+    '027': { name: '鉄の剣',         type: '剣',   baseAtk: 550,    img: 'images/027.png', rare: 3 },
+    '028': { name: '鉄の銃',         type: '銃',   baseAtk: 400,    img: 'images/028.png', rare: 3 },
+    '029': { name: '鉄の杖',         type: '魔法', baseAtk: 800,    img: 'images/029.png', rare: 3 },
+    '030': { name: 'オーラを放つ剣', type: '剣',   baseAtk: 6000,   img: 'images/030.png', rare: 4 },
+    '031': { name: 'オーラを放つ銃', type: '銃',   baseAtk: 4500,   img: 'images/031.png', rare: 4 },
+    '032': { name: 'オーラを放つ杖', type: '魔法', baseAtk: 9000,   img: 'images/032.png', rare: 4 },
+    '033': { name: '覇王の剣',       type: '剣',   baseAtk: 70000,  img: 'images/033.png', rare: 5 },
+    '034': { name: '覇王の銃',       type: '銃',   baseAtk: 55000,  img: 'images/034.png', rare: 5 },
+    '035': { name: '覇王の杖',       type: '魔法', baseAtk: 120000, img: 'images/035.png', rare: 5 }
+};
+const TREASURES_DB = {
+    'tr1': { name: '錆びた手鏡',     type: 'atk',    val: 0.05 },
+    'tr2': { name: '旅人の財布',     type: 'gold',   val: 0.05 },
+    'tr3': { name: '古びた虫眼鏡',   type: 'hit',    val: 2    },
+    'tr4': { name: '魔力の結晶',     type: 'dia',    val: 0.05 },
+    'tr5': { name: '転生の証',       type: 'ptgain', val: 0.10 },
+    'tr6': { name: '疾風の羽根',     type: 'spd',    val: 0.03 },
+    'tr7': { name: 'インフレの刻印', type: 'atk',    val: 0.20 }
+};
+const PRESTIGE_SHOP = {
+    atk:    { costBase:5,  costMul:1.6, effect: lv=>`攻撃力 +${lv*5}%` },
+    spd:    { costBase:8,  costMul:1.8, effect: lv=>`速度 -${lv*3}%` },
+    gold:   { costBase:5,  costMul:1.6, effect: lv=>`Gold +${lv*10}%` },
+    hit:    { costBase:6,  costMul:1.6, effect: lv=>`命中 +${lv*5}` },
+    dia:    { costBase:10, costMul:1.8, effect: lv=>`ダイヤ +${lv*10}%` },
+    ptgain: { costBase:15, costMul:2.0, effect: lv=>`転生Pt +${lv*10}%` },
+    skip:   { costBase:20, costMul:2.0, effect: lv=>`スキップ ${lv*10}%` }
+};
+
+// ===== 状態 =====
+let player = {
+    gold:0, diamond:0, prestigePt:0, stage:1,
+    ownedCats:{'002':1}, inventory:{}, treasures:{},
+    upgrades:{atk:0,hit:0,spd:0,gold:0},
+    prestigeUpgrades:{atk:0,spd:0,gold:0,hit:0,dia:0,ptgain:0,skip:0}
+};
+let enemy = {hp:10,maxHp:10,id:'001',name:'スライム'};
+const DROP_CHANCE = 0.25;
+let adBuffTimer=0, adWatchCount=0, isNoAdsPurchased=false;
+let partySlots = [
+    {type:'剣', catId:'002', weapId:null},
+    {type:'銃', catId:null,  weapId:null},
+    {type:'魔法',catId:null, weapId:null}
+];
+
+// ===== ヘルパー =====
+function formatNum(n){
+    if(n>=1e12)return(n/1e12).toFixed(2)+'T';
+    if(n>=1e9) return(n/1e9).toFixed(2)+'B';
+    if(n>=1e6) return(n/1e6).toFixed(2)+'M';
+    if(n>=1e4) return(n/1e3).toFixed(1)+'K';
+    return Math.floor(n).toLocaleString();
+}
+function getStars(r){return'★'.repeat(r)+'☆'.repeat(5-r)}
+function getTreasureBonus(type){
+    let b=0;
+    for(let id in player.treasures) if(TREASURES_DB[id].type===type) b+=TREASURES_DB[id].val*player.treasures[id];
+    return b;
+}
+function getPtCost(k){let s=PRESTIGE_SHOP[k];return Math.floor(s.costBase*Math.pow(s.costMul,player.prestigeUpgrades[k]))}
+function getTotalHit(){return Math.floor(player.upgrades.hit*3+player.prestigeUpgrades.hit*5+getTreasureBonus('hit'))}
+function getAttackInterval(catId){
+    if(!catId)return 1000;
+    let base=CATS_DB[catId].baseInterval;
+    let red=player.upgrades.spd*0.02+player.prestigeUpgrades.spd*0.03+getTreasureBonus('spd');
+    return Math.max(100,Math.floor(base*(1-red)));
+}
+function getBestWeaponForType(type){
+    let best=-1,id=null;
+    for(let wid in WEAPONS_DB) if(WEAPONS_DB[wid].type===type&&player.inventory[wid]){
+        let a=WEAPONS_DB[wid].baseAtk*(1+(player.inventory[wid]-1)*0.005);
+        if(a>best){best=a;id=wid}
+    }
+    return{id,atk:best}
+}
+function autoSelectBestCatForSlot(type){
+    let best=-1,id=null;
+    for(let cid in CATS_DB) if(CATS_DB[cid].type===type&&player.ownedCats[cid]){
+        let s=CATS_DB[cid].baseAtk*(1+(player.ownedCats[cid]-1)*0.05);
+        if(s>best){best=s;id=cid}
+    }
+    return id;
+}
+
+// ===== 攻撃エフェクト =====
+function spawnDmgPop(dmg){
+    let area = document.getElementById('enemy-area');
+    let el = document.createElement('div');
+    el.className='dmg-pop';
+    el.textContent='-'+formatNum(dmg);
+    el.style.left=(30+Math.random()*40)+'%';
+    el.style.top='20%';
+    area.appendChild(el);
+    setTimeout(()=>el.remove(),850);
+}
+function triggerCatAnim(slotIndex, type){
+    let unit = document.getElementById('cat-unit-'+slotIndex);
+    if(!unit)return;
+    let cls = type==='銃'?'gun-attack':type==='魔法'?'magic-attack':'attacking';
+    unit.classList.add(cls);
+    setTimeout(()=>unit.classList.remove(cls),350);
+    // 弾エフェクト
+    let img = unit.querySelector('img');
+    if(!img)return;
+    let el = document.createElement('div');
+    if(type==='銃'){
+        el.className='bullet';
+        el.textContent='💥';
+        el.style.fontSize='14px';
+    } else if(type==='魔法'){
+        el.className='magic-orb';
+        el.textContent='✨';
+        el.style.fontSize='16px';
+    } else {
+        el.className='slash-effect';
+        el.textContent='⚔';
+    }
+    el.style.left='0';el.style.top='-10px';
+    unit.style.position='relative';
+    unit.appendChild(el);
+    setTimeout(()=>el.remove(),400);
+}
+function shakeEnemy(){
+    let img=document.getElementById('enemy-main-img');
+    img.classList.add('enemy-shake');
+    setTimeout(()=>img.classList.remove('enemy-shake'),300);
+}
+
+// ===== タイマー =====
+let attackTimers=[];
+function resetAttackTimers(){
+    attackTimers.forEach(t=>clearInterval(t));
+    attackTimers=partySlots.map((slot,i)=>{
+        let interval=getAttackInterval(slot.catId);
+        return setInterval(()=>catAttack(i),interval);
+    });
+}
+
+// ===== ゲームロジック =====
+// 命中：10ステージ毎に上昇
+function getHitRequirement(stg){
+    let b=Math.floor((stg-1)/10);
+    const r=[0,2,5,10,18,30,50,80];
+    return r[b]!==undefined?r[b]:80+(b-7)*40;
+}
+// 敵HP：緩やかなカーブ
+function getEnemyMaxHp(stg){
+    if(stg<=10) return stg*8;
+    if(stg<=20) return 80+(stg-10)*40;
+    if(stg<=30) return 480+(stg-20)*120;
+    if(stg<=50) return 1680+(stg-30)*400;
+    let base=[9680,50000,250000,1500000,10000000];
+    let idx=Math.floor((stg-50)/20);
+    return(base[idx]!==undefined?base[idx]:10000000*Math.pow(6,idx-4))*(1+(stg%20)*0.1);
+}
+function getPrestigePointGain(){
+    if(player.stage<5)return 0;
+    let b=1+player.prestigeUpgrades.ptgain*0.10+getTreasureBonus('ptgain');
+    return Math.floor(Math.pow(player.stage-4,1.8)*0.5*b);
+}
+
+// ===== 制限時間・進行/周回モード =====
+const STAGE_TIME_LIMIT = 15;
+let stageTimer = STAGE_TIME_LIMIT;
+let stageTimerInterval = null;
+let isFarmingMode = false;
+
+function startStageTimer(){
+    stageTimer = STAGE_TIME_LIMIT;
+    clearInterval(stageTimerInterval);
+    stageTimerInterval = setInterval(()=>{
+        if(isFarmingMode) return; // 周回中はカウントしない
+        stageTimer--;
+        updateTimerUI();
+        if(stageTimer<=0){
+            clearInterval(stageTimerInterval);
+            enterFarmingMode();
+        }
+    },1000);
+}
+function enterFarmingMode(){
+    isFarmingMode=true;
+    enemy.hp=enemy.maxHp; // HPリセット
+    log(`⏰ 時間切れ！【${enemy.name}】を周回中...`);
+    updateTimerUI();
+}
+function exitFarmingMode(){
+    isFarmingMode=false;
+    startStageTimer();
+    log('▶ 進行モードに切り替え！');
+    updateTimerUI();
+}
+function updateTimerUI(){
+    let el=document.getElementById('stage-timer');
+    let btn=document.getElementById('mode-btn');
+    if(!el||!btn)return;
+    if(isFarmingMode){
+        el.textContent='🔄 周回中';
+        el.style.color='#ffd740';
+        btn.style.display='block';
+    } else {
+        el.textContent=`⏱ ${stageTimer}秒`;
+        el.style.color=stageTimer<=5?'#ff5252':'rgba(255,255,255,.8)';
+        btn.style.display='none';
+    }
+}
+
+function spawnEnemy(){
+    let skipPct=player.prestigeUpgrades.skip*10;
+    let skip=Math.floor(skipPct/100)+(Math.random()*100<skipPct%100?1:0);
+    if(skip>0){player.stage+=skip;log(`⏭️ ${skip}ステスキップ！`)}
+    let keys=Object.keys(ENEMIES_DB);
+    let id=keys[(player.stage-1)%keys.length];
+    enemy.id=id;enemy.name=ENEMIES_DB[id].name;
+    enemy.maxHp=getEnemyMaxHp(player.stage);enemy.hp=enemy.maxHp;
+    let img=document.getElementById('enemy-main-img');
+    if(!img.src.endsWith(ENEMIES_DB[id].img))img.src=ENEMIES_DB[id].img;
+    document.getElementById('enemy-name-tag').textContent=`【${enemy.name}】`;
+    startStageTimer();
+}
+function catAttack(slotIndex){
+    let slot=partySlots[slotIndex];
+    if(!slot.catId)return;
+    let req=getHitRequirement(player.stage),my=getTotalHit();
+    if(my<req&&Math.random()*100>(100-(req-my)))return;
+    let cat=CATS_DB[slot.catId],cnt=player.ownedCats[slot.catId];
+    let catBase=cat.baseAtk*(1+(cnt-1)*0.05)*cat.atkWeight;
+    let weapBase=0;
+    if(slot.weapId){let w=WEAPONS_DB[slot.weapId];weapBase=w.baseAtk*(1+(player.inventory[slot.weapId]-1)*0.005)}
+    let atkMul=1+getTreasureBonus('atk')+player.prestigeUpgrades.atk*0.05;
+    let ad=getAdBuffMultiplier();
+    // 攻撃強化：フラット+5→ベースATKの10%/Lv
+    let upgAtk = (catBase+weapBase) * player.upgrades.atk * 0.10;
+    let dmg=(catBase+weapBase+upgAtk)*atkMul*ad;
+    if(slot.weapId==='030'&&Math.random()<.15)dmg*=4;
+    if(slot.weapId==='031'&&Math.random()<.20)dmg*=3;
+    if(slot.weapId==='032'&&Math.random()<.30)dmg*=3;
+    if(slot.weapId==='033')dmg*=2;
+    if(slot.weapId==='034'&&Math.random()<.40)dmg*=4;
+    if(slot.weapId==='035')dmg*=3;
+    dmg=Math.floor(dmg);
+    enemy.hp-=dmg;
+    triggerCatAnim(slotIndex,cat.type);
+    spawnDmgPop(dmg);
+    shakeEnemy();
+    if(enemy.hp<=0){
+        enemy.hp=0;
+        if(isFarmingMode){
+            // 周回モード：ゴールドなし、HPリセット
+            enemy.hp=enemy.maxHp;
+        } else {
+            enemyKilled();
+        }
+    }
+    updateUI();
+}
+function enemyKilled(){
+    clearInterval(stageTimerInterval);
+    let ad=getAdBuffMultiplier();
+    let gm=1+getTreasureBonus('gold')+player.upgrades.gold*0.10+player.prestigeUpgrades.gold*0.10;
+    let dm=1+getTreasureBonus('dia')+player.prestigeUpgrades.dia*0.10;
+    let g=player.stage*5*gm*ad;player.gold+=g;
+    let d=0;
+    if(Math.random()<DROP_CHANCE*ad){d=Math.floor((5+Math.floor(player.stage*1.5))*dm*ad);player.diamond+=d}
+    log(`💀【${enemy.name}】💰+${formatNum(g)}G ${d>0?'💎+'+d:''}`);
+    player.stage++;
+    updateBestStage();
+    isFarmingMode=false;
+    spawnEnemy();updateUI();
+}
+// ===== セーブ・ロード（Firestore + localStorage二重保存） =====
+const SAVE_KEY = 'nyanko_save_v1';
+
+function getSaveData(){
+    return {
+        gold:             player.gold,
+        diamond:          player.diamond,
+        prestigePt:       player.prestigePt,
+        stage:            player.stage,
+        ownedCats:        player.ownedCats,
+        inventory:        player.inventory,
+        treasures:        player.treasures,
+        upgrades:         player.upgrades,
+        prestigeUpgrades: player.prestigeUpgrades
+    };
+}
+function applyLoadData(data){
+    player.gold             = data.gold             ?? 0;
+    player.diamond          = data.diamond          ?? 0;
+    player.prestigePt       = data.prestigePt       ?? 0;
+    player.stage            = data.stage            ?? 1;
+    player.ownedCats        = data.ownedCats        ?? {'002':1};
+    player.inventory        = data.inventory        ?? {};
+    player.treasures        = data.treasures        ?? {};
+    player.upgrades         = data.upgrades         ?? {atk:0,hit:0,spd:0,gold:0};
+    player.prestigeUpgrades = data.prestigeUpgrades ?? {atk:0,spd:0,gold:0,hit:0,dia:0,ptgain:0,skip:0};
+}
+
+function saveGame(){
+    const data = getSaveData();
+    // localStorageに即時保存
+    localStorage.setItem(SAVE_KEY, JSON.stringify(data));
+    // Firestoreにも非同期保存
+    if(window._firestoreReady){
+        const uid = window._getUID();
+        import('https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js')
+            .then(({setDoc}) => setDoc(window._docRef(uid), data))
+            .catch(e => console.log('Cloud保存失敗:', e));
+    }
+}
+
+async function loadGame(){
+    // まずlocalStorageから読み込み（即時）
+    try {
+        const raw = localStorage.getItem(SAVE_KEY);
+        if(raw){ applyLoadData(JSON.parse(raw)); log('💾 ローカルデータ読込'); }
+    } catch(e){}
+
+    // Firestoreからも読み込み（クラウド優先）
+    if(window._firestoreReady){
+        try {
+            const uid = window._getUID();
+            const {getDoc} = await import('https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js');
+            const snap = await getDoc(window._docRef(uid));
+            if(snap.exists()){
+                applyLoadData(snap.data());
+                localStorage.setItem(SAVE_KEY, JSON.stringify(snap.data()));
+                log('☁️ クラウドデータ読込完了');
+                spawnEnemy(); resetAttackTimers(); updateUI();
+            }
+        } catch(e){ console.log('Cloud読込失敗:', e); }
+    }
+}
+
+function buyUpgrade(type){
+    const c={atk:Math.floor(10*Math.pow(1.48,player.upgrades.atk)),hit:Math.floor(15*Math.pow(1.55,player.upgrades.hit)),spd:Math.floor(50*Math.pow(1.80,player.upgrades.spd)),gold:Math.floor(25*Math.pow(1.52,player.upgrades.gold))};
+    if(player.gold>=c[type]){player.gold-=c[type];player.upgrades[type]++;if(type==='spd')resetAttackTimers();saveGame();}
+    updateUI();
+}
+function buyPrestige(key){
+    let cost=getPtCost(key);
+    if(player.prestigePt<cost)return;
+    player.prestigePt-=cost;player.prestigeUpgrades[key]++;
+    if(key==='spd')resetAttackTimers();
+    saveGame();
+    updateUI();
+}
+let gachaTimes = 1;
+
+function setGachaTimes(n){
+    gachaTimes = n;
+    ['1','10','100','max'].forEach(k=>{
+        document.getElementById('gtimes-'+k).classList.toggle('active', String(n)===k);
+    });
+    updateGachaCost();
+}
+
+function updateGachaCost(){
+    const costs = {weapon:100, cat:150, treasure:80};
+    const times = gachaTimes === 'max'
+        ? Math.floor(player.diamond / Math.min(costs.weapon, costs.cat, costs.treasure))
+        : gachaTimes;
+    document.getElementById('gacha-cost-weapon').textContent  = formatNum(costs.weapon  * times);
+    document.getElementById('gacha-cost-cat').textContent     = formatNum(costs.cat     * times);
+    document.getElementById('gacha-cost-treasure').textContent= formatNum(costs.treasure* times);
+}
+
+function rollOnce(type){
+    let r=Math.random()*100;
+    let rare=r<1.2?5:r<5.5?4:r<16?3:r<35?2:1;
+    if(type==='weapon'){
+        let pool=Object.keys(WEAPONS_DB).filter(id=>WEAPONS_DB[id].rare===rare);
+        let id=pool[Math.floor(Math.random()*pool.length)];
+        player.inventory[id]=(player.inventory[id]||0)+1;
+        return {rare, name:WEAPONS_DB[id].name};
+    } else if(type==='cat'){
+        let sid=2+(rare-1)*3,pool=[];
+        for(let i=0;i<3;i++){let s=String(sid+i).padStart(3,'0');if(CATS_DB[s])pool.push(s)}
+        let id=pool[Math.floor(Math.random()*pool.length)];
+        player.ownedCats[id]=(player.ownedCats[id]||0)+1;
+        return {rare, name:CATS_DB[id].name, catId:id};
+    } else {
+        let pool=rare>=4?['tr5','tr6','tr7']:rare===3?['tr3','tr4','tr6']:['tr1','tr2','tr3'];
+        let id=pool[Math.floor(Math.random()*pool.length)];
+        player.treasures[id]=(player.treasures[id]||0)+1;
+        if(id==='tr6') resetAttackTimers();
+        return {rare, name:TREASURES_DB[id].name};
+    }
+}
+
+function rollGacha(type){
+    const costs={weapon:100,cat:150,treasure:80};
+    let cost=costs[type];
+    let times = gachaTimes==='max' ? Math.floor(player.diamond/cost) : gachaTimes;
+    if(times<=0){
+        document.getElementById('gacha-result').textContent='💎ダイヤが足りません！';
+        return;
+    }
+    let totalCost = cost * times;
+    if(player.diamond < totalCost){
+        document.getElementById('gacha-result').textContent='💎ダイヤが足りません！';
+        return;
+    }
+    player.diamond -= totalCost;
+
+    // まとめて回す
+    let results=[];
+    let bestRare=0;
+    let needTimerReset=false;
+    for(let i=0;i<times;i++){
+        let res=rollOnce(type);
+        results.push(res);
+        if(res.rare>bestRare) bestRare=res.rare;
+        if(type==='cat') needTimerReset=true;
+    }
+    if(needTimerReset) resetAttackTimers();
+
+    // 結果メッセージ（最高レアを強調、まとめ表示）
+    let bestResult = results.find(r=>r.rare===bestRare);
+    let msg='';
+    if(times===1){
+        const icon = type==='cat'?'🐱':type==='weapon'?'✨':'🎁';
+        msg = `${icon}★${bestRare}【${bestResult.name}】獲得！`;
+    } else {
+        // レア度ごとの集計
+        let counts={1:0,2:0,3:0,4:0,5:0};
+        results.forEach(r=>counts[r.rare]++);
+        let summary = [5,4,3,2,1]
+            .filter(r=>counts[r]>0)
+            .map(r=>`★${r}×${counts[r]}`)
+            .join(' / ');
+        msg = `${times}回！最高★${bestRare}【${bestResult.name}】| ${summary}`;
+    }
+
+    saveGame();
+    document.getElementById('gacha-result').textContent=msg;
+    updateGachaCost();
+    updateUI();
+}
+function doPrestige(){
+    let gain=getPrestigePointGain();
+    if(gain<=0){alert('ステージ5をクリアすると転生できます！');return}
+    player.prestigePt+=gain;player.stage=1;player.gold=0;
+    player.upgrades={atk:0,hit:0,spd:0,gold:0};
+    log(`🌀転生！+${gain}Pt獲得`);spawnEnemy();resetAttackTimers();saveGame();updateUI();
+}
+
+// 広告
+function watchAd(){if(!isNoAdsPurchased)alert('📺動画広告を再生中...');applyAdBuff()}
+function applyAdBuff(){
+    adWatchCount++;adBuffTimer=180;
+    let pct=200+(adWatchCount-1)*5;
+    document.getElementById('ad-buff-text').textContent=`🔥+${pct}%`;
+    document.getElementById('ad-indicator').classList.add('active');
+    log(`📺広告バフ+${pct}%！`);updateUI();
+}
+function toggleNoAds(){isNoAdsPurchased=document.getElementById('no-ads-cheat').checked}
+function handleAdTimer(){
+    if(adBuffTimer<=0)return;adBuffTimer--;
+    let m=Math.floor(adBuffTimer/60),s=adBuffTimer%60;
+    let pct=200+(adWatchCount-1)*5;
+    document.getElementById('ad-timer-text').textContent=`残り${m}分${s}秒 (+${pct}%)`;
+    if(adBuffTimer===0){
+        adWatchCount=0;
+        document.getElementById('ad-buff-text').textContent='OFF';
+        document.getElementById('ad-indicator').classList.remove('active');
+        document.getElementById('ad-timer-text').textContent='動画視聴で3分間【全効果3倍】';
+        log('⏳広告バフ終了');
+    }
+}
+function getAdBuffMultiplier(){return adBuffTimer>0&&adWatchCount>0?1+(200+(adWatchCount-1)*5)/100:1}
+
+// ===== メニュー（ステータス・引き継ぎ） =====
+function openMenu(tab='status'){
+    switchMenuTab(tab);
+    document.getElementById('menu-overlay').classList.add('active');
+    updateUI();
+}
+function closeMenu(){ document.getElementById('menu-overlay').classList.remove('active'); }
+function switchMenuTab(tab){
+    ['status','transfer','help'].forEach(t=>{
+        document.getElementById('tab-'+t).style.display = (t===tab)?'block':'none';
+        document.getElementById('tab-btn-'+t).classList.toggle('active', t===tab);
+    });
+    if(tab==='status') refreshStatus();
+}
+
+// ===== サイドパネル（転生・ガチャ・お宝・広告） =====
+function renderTreasureList(){
+    const el = document.getElementById('treasure-all-list');
+    if(!el) return;
+    let html = '';
+    for(let id in TREASURES_DB){
+        const tr = TREASURES_DB[id];
+        const lv = player.treasures[id] || 0;
+        const owned = lv > 0;
+        const effectVal = (type => {
+            if(type==='hit') return `命中+${tr.val*lv}`;
+            if(type==='spd') return `速度-${(tr.val*lv*100).toFixed(0)}%`;
+            return `+${(tr.val*lv*100).toFixed(0)}%`;
+        })(tr.type);
+        html += `<div style="
+            display:flex;align-items:center;gap:8px;
+            padding:7px 8px;border-radius:8px;margin-bottom:5px;
+            background:${owned?'#f1f8e9':'#f9f9f9'};
+            border:1.5px solid ${owned?'#43a047':'#e0e0e0'};
+            opacity:${owned?1:0.55};
+        ">
+            <div style="font-size:20px">${owned?'🎁':'📦'}</div>
+            <div style="flex:1">
+                <div style="font-size:11px;font-weight:800;color:${owned?'#2e7d32':'#888'}">${tr.name}</div>
+                <div style="font-size:9px;color:#666">${getEffectLabel(tr.type)} / Lv毎に${tr.type==='hit'?tr.val:Math.round(tr.val*100)+'%'}</div>
+            </div>
+            <div style="text-align:right">
+                <div style="font-size:12px;font-weight:900;color:${owned?'#e65100':'#aaa'}">Lv${lv}</div>
+                ${owned?`<div style="font-size:9px;color:#43a047;font-weight:700">${effectVal}</div>`:'<div style="font-size:9px;color:#aaa">未所持</div>'}
+            </div>
+        </div>`;
+    }
+    el.innerHTML = html;
+}
+function getEffectLabel(type){
+    const labels={atk:'ATK強化',gold:'ゴールド',hit:'命中',dia:'ダイヤ',ptgain:'転生Pt',spd:'攻撃速度'};
+    return labels[type]||type;
+}
+
+function openSidePanel(type){
+    document.getElementById(type+'-overlay').classList.add('active');
+    if(type==='treasure') renderTreasureList();
+    if(type==='gacha') updateGachaCost();
+    updateUI();
+}
+function closeSidePanel(type){
+    document.getElementById(type+'-overlay').classList.remove('active');
+}
+
+// 後方互換（古い呼び出しが残っていても動くよう）
+function openShop(tab='status'){ openMenu(tab); }
+function closeShop(){ closeMenu(); }
+function switchTab(tab){ switchMenuTab(tab); }
+function refreshStatus(){
+    let my=getTotalHit(), req=getHitRequirement(player.stage);
+    let rate=my>=req?100:Math.max(0,100-(req-my));
+    document.getElementById('status-body').innerHTML=`
+        <div>⚔️ 攻撃強化: <b>Lv${player.upgrades.atk}</b>　(ベースATK +${player.upgrades.atk*10}%)</div>
+        <div>⚡ 速度強化: <b>Lv${player.upgrades.spd}</b>　(-${player.upgrades.spd*2}%)</div>
+        <div>💰 Gold強化: <b>Lv${player.upgrades.gold}</b>　(+${player.upgrades.gold*10}%)</div>
+        <div>🎯 命中強化: <b>Lv${player.upgrades.hit}</b>　(命中${my} / 必要${req} / ${rate}%)</div>
+        <hr style="border:0;border-top:1px solid #c8e6c9;margin:6px 0">
+        <div>🌀 転生Pt強化 ATK: <b>Lv${player.prestigeUpgrades.atk}</b>　(+${player.prestigeUpgrades.atk*5}%)</div>
+        <div>🌀 転生Pt強化 速度: <b>Lv${player.prestigeUpgrades.spd}</b>　(-${player.prestigeUpgrades.spd*3}%)</div>
+        <div>🌀 転生Pt強化 Gold: <b>Lv${player.prestigeUpgrades.gold}</b>　(+${player.prestigeUpgrades.gold*10}%)</div>
+        <div>🌀 転生Pt強化 命中: <b>Lv${player.prestigeUpgrades.hit}</b>　(+${player.prestigeUpgrades.hit*5})</div>
+        <div>🌀 転生Pt強化 ダイヤ: <b>Lv${player.prestigeUpgrades.dia}</b>　(+${player.prestigeUpgrades.dia*10}%)</div>
+        <div>🌀 転生Pt強化 転生Pt: <b>Lv${player.prestigeUpgrades.ptgain}</b>　(+${player.prestigeUpgrades.ptgain*10}%)</div>
+        <div>🌀 転生Pt強化 スキップ: <b>Lv${player.prestigeUpgrades.skip}</b>　(${player.prestigeUpgrades.skip*10}%)</div>
+        <hr style="border:0;border-top:1px solid #c8e6c9;margin:6px 0">
+        <div>📦 所持キャラ: ${Object.keys(player.ownedCats).map(id=>CATS_DB[id]?`${CATS_DB[id].name}×${player.ownedCats[id]}`:'').filter(Boolean).join('、')}</div>
+        <div>⚔️ 所持武器: ${Object.keys(player.inventory).length===0?'なし':Object.keys(player.inventory).map(id=>WEAPONS_DB[id]?`${WEAPONS_DB[id].name}(${player.inventory[id]}凸)`:'').filter(Boolean).join('、')}</div>
+    `;
+}
+
+// 引き継ぎコード発行
+function generateCode(){
+    const data={
+        gold:player.gold, diamond:player.diamond, prestigePt:player.prestigePt,
+        stage:player.stage, ownedCats:player.ownedCats, inventory:player.inventory,
+        treasures:player.treasures, upgrades:player.upgrades,
+        prestigeUpgrades:player.prestigeUpgrades
+    };
+    const code = btoa(unescape(encodeURIComponent(JSON.stringify(data))));
+    document.getElementById('transfer-code-text').textContent = code;
+    document.getElementById('transfer-code-box').style.display = 'block';
+}
+function copyCode(){
+    const code = document.getElementById('transfer-code-text').textContent;
+    navigator.clipboard.writeText(code).then(()=>{
+        document.getElementById('copy-msg').textContent='✅ コピーしました！';
+        setTimeout(()=>document.getElementById('copy-msg').textContent='', 2000);
+    }).catch(()=>{
+        // fallback: テキスト選択状態にする
+        let el = document.getElementById('transfer-code-text');
+        let range = document.createRange();
+        range.selectNodeContents(el);
+        window.getSelection().removeAllRanges();
+        window.getSelection().addRange(range);
+        document.getElementById('copy-msg').textContent='👆 長押しでコピーしてください';
+    });
+}
+function applyCode(){
+    const input = document.getElementById('transfer-input').value.trim();
+    if(!input){ document.getElementById('transfer-msg').textContent='❌ コードを入力してください'; return; }
+    try {
+        const data = JSON.parse(decodeURIComponent(escape(atob(input))));
+        player.gold             = data.gold             ?? 0;
+        player.diamond          = data.diamond          ?? 0;
+        player.prestigePt       = data.prestigePt       ?? 0;
+        player.stage            = data.stage            ?? 1;
+        player.ownedCats        = data.ownedCats        ?? {'002':1};
+        player.inventory        = data.inventory        ?? {};
+        player.treasures        = data.treasures        ?? {};
+        player.upgrades         = data.upgrades         ?? {atk:0,hit:0,spd:0,gold:0};
+        player.prestigeUpgrades = data.prestigeUpgrades ?? {atk:0,spd:0,gold:0,hit:0,dia:0,ptgain:0,skip:0};
+        saveGame();
+        spawnEnemy();
+        resetAttackTimers();
+        updateUI();
+        document.getElementById('transfer-msg').style.color='#2e7d32';
+        document.getElementById('transfer-msg').textContent='✅ 引き継ぎ成功！';
+        document.getElementById('transfer-input').value='';
+        log('🔑 データを引き継ぎました！');
+    } catch(e) {
+        document.getElementById('transfer-msg').style.color='#c62828';
+        document.getElementById('transfer-msg').textContent='❌ コードが正しくありません';
+    }
+}
+
+// キャラ詳細
+function clickSlot(i){
+    let slot=partySlots[i];
+    if(!slot.catId){alert('ガチャでキャラを獲得しよう！');return}
+    let cat=CATS_DB[slot.catId],cnt=player.ownedCats[slot.catId];
+    let iv=getAttackInterval(slot.catId);
+    let wHtml='素手';
+    if(slot.weapId){let w=WEAPONS_DB[slot.weapId];wHtml=`${w.name} ★${w.rare} ${player.inventory[slot.weapId]}凸`}
+    document.getElementById('pop-title').textContent=`【${cat.name}】`;
+    document.getElementById('pop-body').innerHTML=`
+        <span class="r${cat.rare}">${getStars(cat.rare)}</span> ★${cat.rare} / ${cat.type}<br>
+        所持: ${cnt}体　ATK倍率: ×${cat.atkWeight}<br>
+        基礎ATK: <strong>${formatNum(cat.baseAtk)}</strong><br>
+        攻撃間隔: <strong>${(iv/1000).toFixed(2)}秒/回</strong><br>
+        装備: ${wHtml}
+    `;
+    document.getElementById('cat-popup').classList.add('active');
+}
+function closeCatPopup(){document.getElementById('cat-popup').classList.remove('active')}
+
+// ===== UI更新 =====
+function updateUI(){
+    document.getElementById('res-gold').textContent=formatNum(player.gold);
+    document.getElementById('res-diamond').textContent=player.diamond.toLocaleString();
+    document.getElementById('res-prestige').textContent=player.prestigePt.toLocaleString();
+    document.getElementById('prestige-pt-display2').textContent=player.prestigePt.toLocaleString();
+    let sn=Math.ceil(player.stage/5),si=(player.stage-1)%5;
+    document.getElementById('stage-display').textContent=`ステージ${sn}(${si}/5)`;
+
+    // HP
+    let pct=Math.max(0,enemy.hp/enemy.maxHp*100);
+    document.getElementById('enemy-hp-bar').style.width=pct+'%';
+    document.getElementById('enemy-hp-text').textContent=`HP:${formatNum(enemy.hp)}/${formatNum(enemy.maxHp)}`;
+
+    // キャラユニット更新
+    partySlots.forEach((slot,i)=>{
+        let bestCatId=autoSelectBestCatForSlot(slot.type);
+        if(partySlots[i].catId!==bestCatId){partySlots[i].catId=bestCatId;resetAttackTimers()}
+        partySlots[i].weapId=getBestWeaponForType(slot.type).id;
+        let unit=document.getElementById('cat-unit-'+i);
+        let emptyEl=document.getElementById('cat-empty-'+i);
+        let labelEl=document.getElementById('cat-label-'+i);
+        let weapLabelEl=document.getElementById('cat-weap-'+i);
+        let weapBoxEl=document.getElementById('cat-weap-box-'+i);
+        let weapImgEl=document.getElementById('cat-weap-img-'+i);
+        let imgEl=document.getElementById('cat-img-'+i);
+        if(bestCatId){
+            let cat=CATS_DB[bestCatId];
+            // キャラ画像表示
+            if(imgEl){
+                if(!imgEl.src.endsWith(cat.img)) imgEl.src=cat.img;
+                imgEl.style.display='block';
+            }
+            if(emptyEl) emptyEl.style.display='none';
+            if(labelEl){ labelEl.style.display='block'; labelEl.textContent=cat.name; }
+            // 武器
+            let wid=partySlots[i].weapId;
+            if(weapBoxEl && weapImgEl){
+                if(wid){
+                    weapBoxEl.style.display='flex';
+                    if(!weapImgEl.src.endsWith(WEAPONS_DB[wid].img)) weapImgEl.src=WEAPONS_DB[wid].img;
+                } else {
+                    weapBoxEl.style.display='none';
+                }
+            }
+            if(weapLabelEl){
+                weapLabelEl.style.display='block';
+                weapLabelEl.textContent = wid ? WEAPONS_DB[wid].name : '素手';
+            }
+        } else {
+            if(imgEl) imgEl.style.display='none';
+            if(emptyEl) emptyEl.style.display='flex';
+            if(labelEl) labelEl.style.display='none';
+            if(weapLabelEl) weapLabelEl.style.display='none';
+            if(weapBoxEl) weapBoxEl.style.display='none';
+        }
+    });
+
+    // 強化ボタン
+    const gc={atk:Math.floor(10*Math.pow(1.48,player.upgrades.atk)),hit:Math.floor(15*Math.pow(1.55,player.upgrades.hit)),spd:Math.floor(50*Math.pow(1.80,player.upgrades.spd)),gold:Math.floor(25*Math.pow(1.52,player.upgrades.gold))};
+    for(let k of['atk','hit','spd','gold']){
+        document.getElementById('cost-up-'+k).textContent=formatNum(gc[k]);
+        document.getElementById('lv-up-'+k).textContent=player.upgrades[k];
+        document.getElementById('btn-up-'+k).disabled=player.gold<gc[k];
+    }
+
+    // 転生ショップ
+    for(let k of['atk','spd','gold','hit','dia','ptgain','skip']){
+        let cost=getPtCost(k),lv=player.prestigeUpgrades[k];
+        document.getElementById('pt-cost-'+k).textContent=cost;
+        document.getElementById('pt-lv-'+k).textContent=lv;
+        document.getElementById('pt-eff-'+k).textContent=lv>0?PRESTIGE_SHOP[k].effect(lv):'効果なし';
+        document.getElementById('pt-btn-'+k).disabled=player.prestigePt<cost;
+    }
+
+    // 転生ボタン
+    let pg=getPrestigePointGain();
+    document.getElementById('gain-prestige-pt').textContent=pg>0?`+${pg}Pt`:'Ste5クリアで解放';
+
+    // お宝
+    let th=Object.keys(player.treasures).length===0?'お宝なし':
+        Object.entries(player.treasures).map(([id,lv])=>`・${TREASURES_DB[id].name} Lv${lv}`).join('<br>');
+    document.getElementById('treasure-display').innerHTML=th;
+}
+
+function log(msg){
+    let b=document.getElementById('battle-log');
+    b.innerHTML+=msg+'<br>';b.scrollTop=b.scrollHeight;
+}
+
+// ===== ランキング =====
+let myBestStage = 0;
+
+function updateBestStage(){
+    if(player.stage > myBestStage){
+        myBestStage = player.stage;
+        // Firestoreに最高ステージを保存
+        if(window._firestoreReady){
+            const uid = window._getUID();
+            const nickname = localStorage.getItem('nyanko_nickname');
+            if(nickname){
+                import('https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js')
+                    .then(({setDoc, doc}) => setDoc(
+                        doc(window._db, 'ranking', uid),
+                        { nickname, bestStage: myBestStage, updatedAt: Date.now() }
+                    )).catch(e => console.log('ランキング更新失敗:', e));
+            }
+        }
+    }
+}
+
+async function loadRanking(){
+    let listEl = document.getElementById('ranking-list');
+    listEl.innerHTML = '<div style="text-align:center;color:#888;padding:20px">読み込み中...</div>';
+    try {
+        const {collection, getDocs, orderBy, query, limit} =
+            await import('https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js');
+        const q = query(collection(window._db, 'ranking'), orderBy('bestStage','desc'), limit(20));
+        const snap = await getDocs(q);
+        const uid = window._getUID();
+        let html = '';
+        let myRank = '-';
+        let rank = 1;
+        snap.forEach(d => {
+            const data = d.data();
+            const isMe = d.id === uid;
+            const medal = rank===1?'🥇':rank===2?'🥈':rank===3?'🥉':`${rank}.`;
+            html += `<div style="
+                display:flex;align-items:center;gap:8px;
+                padding:6px 8px;border-radius:8px;margin-bottom:4px;
+                background:${isMe?'rgba(67,160,71,0.12)':'#f9f9f9'};
+                border:1.5px solid ${isMe?'#43a047':'#e0e0e0'};
+                font-weight:${isMe?'800':'400'};
+            ">
+                <span style="width:28px;text-align:center;font-size:13px">${medal}</span>
+                <span style="flex:1;color:${isMe?'#2e7d32':'#333'}">${data.nickname}${isMe?' (あなた)':''}</span>
+                <span style="color:#e65100;font-weight:800">St.${data.bestStage}</span>
+            </div>`;
+            if(isMe) myRank = rank;
+            rank++;
+        });
+        if(snap.empty) html = '<div style="text-align:center;color:#888;padding:20px">まだデータがありません</div>';
+        listEl.innerHTML = html;
+        document.getElementById('my-rank-text').textContent = myRank;
+        document.getElementById('my-best-stage').textContent = myBestStage || '-';
+    } catch(e){
+        listEl.innerHTML = '<div style="text-align:center;color:#e53935;padding:20px">読み込み失敗</div>';
+        console.log('ランキング読込失敗:', e);
+    }
+}
+
+function openRankingPanel(){
+    const nickname = localStorage.getItem('nyanko_nickname');
+    if(!nickname){
+        // ニックネーム未登録→登録ダイアログを表示
+        document.getElementById('nickname-overlay').classList.add('active');
+    } else {
+        openSidePanel('ranking');
+        loadRanking();
+    }
+}
+
+function registerNickname(){
+    const input = document.getElementById('nickname-input').value.trim();
+    const errEl = document.getElementById('nickname-error');
+    if(!input){ errEl.textContent = '名前を入力してください'; return; }
+    if(input.length < 2){ errEl.textContent = '2文字以上で入力してください'; return; }
+    localStorage.setItem('nyanko_nickname', input);
+    document.getElementById('nickname-overlay').classList.remove('active');
+    // 登録と同時にランキングに現在のデータを送信
+    updateBestStage();
+    openSidePanel('ranking');
+    loadRanking();
+}
+
+function initGame(){
+    loadGame();
+    spawnEnemy();resetAttackTimers();
+    setInterval(updateUI,250);setInterval(handleAdTimer,1000);
+    // バージョンチェック・自動更新
+    checkVersion();
+    // Service Worker登録（GitHub Pages対応）
+    if('serviceWorker' in navigator){
+        navigator.serviceWorker.register('./sw.js', {scope: './'})
+            .then(reg => console.log('SW登録完了', reg.scope))
+            .catch(e => console.log('SW登録失敗', e));
+    }
+}
+
+const VERSION = '1.0.0';
+function checkVersion(){
+    fetch('./version.json?t=' + Date.now())
+        .then(r => r.json())
+        .then(data => {
+            if(data.version !== VERSION){
+                // キャッシュ削除して自動リロード
+                if('caches' in window){
+                    caches.keys().then(keys =>
+                        Promise.all(keys.map(k => caches.delete(k)))
+                    ).then(() => location.reload(true));
+                } else {
+                    location.reload(true);
+                }
+            }
+        })
+        .catch(() => {}); // オフライン時は何もしない
+}
+window.onload=initGame;
+</script>
+<!-- Firebase SDK -->
+<script type="module">
+import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
+import { getFirestore, doc, setDoc, getDoc } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
+
+const firebaseConfig = {
+    apiKey: "AIzaSyAoJygxlD3YBX_RnzRhgkJXsCxbclKpzsY",
+    authDomain: "abandoned-nurturing.firebaseapp.com",
+    projectId: "abandoned-nurturing",
+    storageBucket: "abandoned-nurturing.firebasestorage.app",
+    messagingSenderId: "419466535493",
+    appId: "1:419466535493:web:917083db21a78517b1b92c"
+};
+
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
+window._db = db;
+window._firestoreReady = true;
+window._docRef = (uid) => doc(db, 'players', uid);
+
+// UID生成（端末固有ID）
+function getUID(){
+    let uid = localStorage.getItem('nyanko_uid');
+    if(!uid){ uid = 'u_' + Date.now() + '_' + Math.random().toString(36).slice(2); localStorage.setItem('nyanko_uid', uid); }
+    return uid;
+}
+window._getUID = getUID;
+
+console.log('Firebase初期化完了');
+</script>
+
+</body>
+</html>
